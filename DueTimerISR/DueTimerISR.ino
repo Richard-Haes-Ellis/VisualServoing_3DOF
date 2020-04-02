@@ -57,8 +57,10 @@ typedef struct
 speedRampData motor;
 
 int pos = 50000;
-int acc = 100;
-int vel = 1000;
+int acc = 5;
+int vel = 500;
+
+unsigned int stepsTaken;
 
 void startTimer()
 {
@@ -195,6 +197,7 @@ void speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
 
               TC1->TC_CHANNEL[0].TC_RC = 10; // Doesent really matter because its the time for the first step, after that it would already be recalculated.
               startTimer();
+              stepsTaken = 0;
        }
 }
 
@@ -206,12 +209,11 @@ void TC3_Handler()
        static unsigned int step_count = 0; // Counting steps when moving.
        static unsigned int rest = 0;       // Keep track of remainder from new_step-delay calculation to incrase accurancy
 
-       TC1->TC_CHANNEL[0].TC_RC = motor.step_delay; // Set counter limit in the timer counter register
-
        switch (motor.run_state)
        {
        case STOP:
               step_count = 0;
+              stepsTaken = 0;
               rest = 0;
               stopTimer();
               motor.running = FALSE;
@@ -219,11 +221,13 @@ void TC3_Handler()
               break;
 
        case ACCEL:
+              /////// WE STEP ONCE /////////
               digitalWrite(PIN_Z_STEP, HIGH);
               digitalWrite(PIN_Z_STEP, LOW);
               step_count++;
+              stepsTaken++;
+              //////////////////////////////
               motor.n++; // This is the n in the equations
-
 
               new_step_delay = motor.step_delay - (((2 * (long)motor.step_delay) + rest) / (4 * motor.n + 1));
               rest = ((2 * (long)motor.step_delay) + rest) % (4 * motor.n + 1);
@@ -232,8 +236,9 @@ void TC3_Handler()
               
               if (step_count >= motor.decel_start)             // Chech if we should start decelration.
               {
-                     motor.n = motor.decel_val;                // Is it not the same already??? NO, decel_val is negative.
+                     // motor.n = motor.decel_val;             // Is it not the same already??? NO, decel_val is negative.
                      motor.run_state = DECEL;
+                     rest = 0;
               } 
               else if (new_step_delay <= motor.min_delay)      // Chech if we hitted max speed.
               {
@@ -245,14 +250,19 @@ void TC3_Handler()
               break;
 
        case RUN:
+              /////// WE STEP ONCE /////////
               digitalWrite(PIN_Z_STEP, HIGH);
               digitalWrite(PIN_Z_STEP, LOW);
               step_count++;
+              stepsTaken++;
+              //////////////////////////////
+
               new_step_delay = motor.min_delay; // I think its not neccesary
               // Chech if we should start decelration.
               if (step_count >= motor.decel_start)
               {
-                     motor.n = motor.decel_val;
+                     // motor.n = motor.decel_val;
+                     rest = 0;
                      // Start decelration with same delay as accel ended with.
                      new_step_delay = last_accel_delay;
                      motor.run_state = DECEL;
@@ -260,20 +270,29 @@ void TC3_Handler()
               break;
 
        case DECEL:
+              /////// WE STEP ONCE /////////
               digitalWrite(PIN_Z_STEP, HIGH);
               digitalWrite(PIN_Z_STEP, LOW);
               step_count++;
-              motor.n++; // Starts out negative and slowarly goes positive.
-              new_step_delay = motor.step_delay - (((2 * (long)motor.step_delay) + rest) / (4 * motor.n + 1));
-              rest = ((2 * (long)motor.step_delay) + rest) % (4 * motor.n + 1);
+              stepsTaken++;
+              //////////////////////////////
+              
+              motor.n--; // Starts out negative and slowarly goes positive.
+              new_step_delay = (long)motor.step_delay*((4 * motor.n + 1 + rest)/(4 * motor.n + 1 - 2));
+              rest = (4 * motor.n + 1 + rest) % (4 * motor.n + 1 - 2);
               // Check if we at last steps
-              if (motor.n >= 0)
+              if (motor.n <= 0)
               {
                      motor.run_state = STOP;
+                     rest = 0;
+                     stopTimer();
+                     motor.running = FALSE;
+                     digitalWrite(PIN_Z_ENABLE, HIGH);
               }
               break;
        }
        motor.step_delay = new_step_delay;
+       TC1->TC_CHANNEL[0].TC_RC = motor.step_delay; // Set counter limit in the timer counter register
 }
 
 void setup()
@@ -305,6 +324,7 @@ void loop()
               Serial.println(" n:"            + String(motor.n)           +
                              " run_state:"    + String(motor.run_state)   +
                              " running:"      + String(motor.running)     +
+                             " step:"         + String(stepsTaken)        +
                              " step_delay:"   + String(motor.step_delay));
        }
        Serial.println("Finished movement");

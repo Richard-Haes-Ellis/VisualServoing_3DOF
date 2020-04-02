@@ -91,9 +91,8 @@ for inter=1:steps*50
             % Check if we should start decelration.
             if (step_count >= decel_start)
                 
-                % n = decel_val; % Is it not the same already??? NO, decel_val is negative.
+                n = decel_val; % Is it not the same already??? NO, decel_val is negative.
                 run_state = 3;
-                rest = 0;
                 % Chech if we hitted max speed.
             elseif (new_step_delay <= min_delay)
                 
@@ -110,7 +109,6 @@ for inter=1:steps*50
             if (step_count >= decel_start)
                 
                 % n = decel_val;
-                rest = 0;
                 % Start decelration with same delay as accel ended with.
                 new_step_delay = last_accel_delay;
                 run_state = 3;
@@ -119,10 +117,10 @@ for inter=1:steps*50
         case 3,
             step_count=step_count+1;
             n=n-1; % Starts out negative and slowly goes positive.
-            new_step_delay = int64(step_delay*((4 * n + 1 + rest) / (4 * n + 1 -2)));
-            rest = rem((4 * n + 1 + rest),(4 * n + 1 -2));
+            new_step_delay = int64(step_delay((4 * n + 1 + rest) / (4 * n + 1 -2)));
+            rest = rem((4 * n + 1 + rest),(4 * n + 1));
             % % Check if we at last steps
-            if (n <= 0)
+            if (n >= 0)
                 run_state = 0;
             end
     end
