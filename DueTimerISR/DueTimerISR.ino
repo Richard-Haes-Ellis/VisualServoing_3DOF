@@ -4,7 +4,7 @@
 // Maths constants. To simplify maths when calculating in speed_cntr_Move().
 #define ALPHA (2 * 3.14159 / SPR)                    // 2*pi/spr
 #define A_T_x100 ((long)(ALPHA * T1_FREQ * 100))     // (ALPHA / T1_FREQ)*100
-#define T1_FREQ_148 ((int)((T1_FREQ * 0.676) / 100)) // divided by 100 and scaled by 0.676
+#define T1_FREQ_148 ((int)(T1_FREQ * 0.676))         // divided by 100 and scaled by 0.676
 #define A_SQ (long)(ALPHA * 2 * 10000000000)         // ALPHA*2*10000000000
 #define A_x20000 (int)(ALPHA * 20000)                // ALPHA*20000
 
@@ -52,18 +52,19 @@ typedef struct
        uint8_t dir_pin;
 
        // Motor status at any given time
-       unsigned char dir : 1;       //! Direction stepper axis1 should move.
-       int          step_position;
-       unsigned char running;
-       unsigned int step_count;
+       volatile uint8_t dir;       //! Direction stepper axis1 should move.
+       volatile uint32_t step_position;
+       volatile uint8_t running;
        
        // Interrupt variables
-       unsigned int step_delay;     //! Peroid of next timer delay. At start this value set the accelration rate c0.
-       unsigned int min_delay;      //! Minimum time delay (max speed)
-       signed int n;                //! Counter used when accelerateing/decelerateing to calculate step_delay.
-       unsigned int rampUpStepCount;
-       unsigned int total_steps;
-       int rest;
+       volatile uint32_t step_count;
+       volatile uint32_t step_delay;     //! Peroid of next timer delay. At start this value set the accelration rate c0.
+       volatile float step_delay_f;
+       volatile uint32_t min_delay;      //! Minimum time delay (max speed)
+       volatile uint32_t n;                //! Counter used when accelerateing/decelerateing to calculate step_delay.
+       volatile uint32_t rampUpStepCount;
+       volatile uint32_t total_steps;
+       volatile  int32_t rest;
        
 } speedRampData;
 
@@ -121,13 +122,14 @@ void configureTimer(Tc *tc, uint32_t channel, IRQn_Type irq, uint32_t frequency)
 int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
 {
        axis1.dir = steps > 0 ? CCW : CW;                // Save the direction state 
-       digitalWrite(axis1.dir_pin,steps>0?HIGH:LOW);        // Set the direction depending on the steps
+       digitalWrite(axis1.dir_pin,steps>0?HIGH:LOW);    // Set the direction depending on the steps
        axis1.total_steps = abs(steps);                  // Change the sign of the steps to positive
        if(accel == 0){                                  // If we get zero acceleration get out.
               return false;
        }
        // CALCULATE ACCELERATION C0
-       axis1.step_delay = T1_FREQ*sqrt((float)2/accel);        // We save the acceleration to the first step delay. (NEEDS CHANGING)
+       axis1.step_delay_f = (float)T1_FREQ_148*sqrt((float)2/accel);        // We save the acceleration to the first step delay. (NEEDS CHANGING)
+       axis1.step_delay = axis1.step_delay_f;
        axis1.step_count = 0;                            // Initialize the step count to zero 
        axis1.n = 0;                                     // Set the ramp counter to zero.
        if(speed == 0){                                  // If we input zero speed get out.
@@ -149,6 +151,7 @@ int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
        Serial.println("Desired position:" +String(steps));
        Serial.println("Acceleration:"     +String(accel));
        Serial.println("Max velocity:"     +String(speed));
+       return 1;
 }
 
 void TC3_Handler()
@@ -173,17 +176,16 @@ void TC3_Handler()
        { 
               // Calculate next delays 
               axis1.n++;    
-              axis1.step_delay = axis1.step_delay - (2 * axis1.step_delay /*+ axis1.rest */) / (4 * axis1.n + 1);
-              // axis1.rest = (2 * axis1.step_delay + axis1.rest) % (4 * axis1.n + 1);
+              axis1.step_delay_f = axis1.step_delay_f - (2 * axis1.step_delay_f /*+ axis1.rest */) / (4 * axis1.n + 1);
 
               // If we reach max speed by checkig if the calculated delay is smaller that the one we calculated with the max speed
-              if (axis1.step_delay <=  axis1.min_delay)
+              if (axis1.step_delay_f <=  (float)axis1.min_delay)
               { 
-                     axis1.step_delay = axis1.min_delay;       // We saturate it to that minimum delay 
+                     axis1.step_delay_f = axis1.min_delay;       // We saturate it to that minimum delay 
                      axis1.rampUpStepCount = axis1.step_count; // We save the number of steps it took to reach this speed
               }
               // If istead we manage to reach half way without reaching full speed we have to start decelerating 
-              if (axis1.step_count >= axis1.total_steps / 2)
+              if (axis1.step_count >= (axis1.total_steps / 2))
               { 
                      axis1.rampUpStepCount = axis1.step_count; // So we save the number of steps it took to accelerate to this speed 
               }
@@ -191,14 +193,14 @@ void TC3_Handler()
        // If we dont have to ramp down yet (we shoudl be in eather run or acelerating)
        else if (axis1.step_count >= axis1.total_steps - axis1.rampUpStepCount)
        { 
-              axis1.n--;
               if(axis1.n!=0)
               {
-                     axis1.step_delay = ( axis1.step_delay * (4 * axis1.n + 1)) / (4 * axis1.n + 1 - 2); // THis is the same as the other equation but inverted
+                     axis1.step_delay_f = ( axis1.step_delay_f * (4 * axis1.n + 1)) / (4 * axis1.n + 1 - 2); // THis is the same as the other equation but inverted
                      
-                     // axis1.rest = ( axis1.step_delay * (4 * axis1.n + 1)) % (4 * axis1.n + 1 - 2);
               }
+              axis1.n--;
        }
+       axis1.step_delay = axis1.step_delay_f;
        TC1->TC_CHANNEL[0].TC_RC = axis1.step_delay;
 }
 
@@ -217,9 +219,9 @@ void setup()
        axis1.step_pin       = PIN_Z_STEP;
        axis1.dir_pin        = PIN_Z_DIR;
 
-       axis1.goal_pos = 50000;
-       axis1.goal_acc = 20;
-       axis1.goal_vel = 20000;
+       axis1.goal_pos = 70000;
+       axis1.goal_acc = 25; // MAX FOR THIS AXIS
+       axis1.goal_vel = 1000; // MAX for this axis
 }
 
 void loop()
