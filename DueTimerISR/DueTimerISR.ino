@@ -49,7 +49,7 @@ typedef struct
        // Motor status at any given time
        unsigned char dir : 1;       //! Direction stepper motor should move.
        int          step_position;
-       unsigned char running : true;
+       unsigned char running;
        unsigned int step_count;
        
        // Interrupt variables
@@ -150,15 +150,15 @@ int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
 void TC3_Handler()
 {
        TC_GetStatus(TC1, 0);               // Timer 1 channel 0 ----> TC3 it also clear the flag
-
-       if (motor.step_count < motor.total_steps)
+       if (motor.step_count <= motor.total_steps)
        {
               digitalWrite(motor.step_pin, HIGH);
               digitalWrite(motor.step_pin, LOW);
               motor.step_count++;
               motor.step_position += motor.dir;
        }
-       else // If we step more that the total it means we have already finished
+
+       if(motor.step_count > motor.total_steps) // If we step more that the total it means we have already finished
        {
               motor.running = false;
               digitalWrite(motor.enable_pin,HIGH);
@@ -187,7 +187,10 @@ void TC3_Handler()
        else if (motor.step_count >= motor.total_steps - motor.rampUpStepCount)
        { 
               motor.n--;
-              motor.step_delay = ( motor.step_delay * (4 * motor.n + 1)) / (4 * motor.n + 1 - 2); // THis is the same as the other equation but inverted
+              if(motor.n!=0)
+              {
+                     motor.step_delay = ( motor.step_delay * (4 * motor.n + 1)) / (4 * motor.n + 1 - 2); // THis is the same as the other equation but inverted
+              }
        }
        TC1->TC_CHANNEL[0].TC_RC = motor.step_delay;
 }
@@ -211,14 +214,14 @@ void setup()
 void loop()
 {
        speed_cntr_Move(pos, acc, vel);
-       while (motor.running)
+       do
        {
               Serial.println(" n:"            + String(motor.n)              +
                              " step:"         + String(motor.step_count)     +
                              " running:"      + String(motor.running)        +
                              " step_pos:"     + String(motor.step_position)  +
                              " step_delay:"   + String(motor.step_delay));
-       }
+       }while(motor.running == true);
        Serial.println("Finished movement");
 
        // Stay there
