@@ -63,6 +63,7 @@ typedef struct
        signed int n;                //! Counter used when accelerateing/decelerateing to calculate step_delay.
        unsigned int rampUpStepCount;
        unsigned int total_steps;
+       int rest;
        
 } speedRampData;
 
@@ -172,8 +173,8 @@ void TC3_Handler()
        { 
               // Calculate next delays 
               axis1.n++;    
-              axis1.step_delay = axis1.step_delay - (2 * axis1.step_delay + axis1.rest) / (4 * axis1.n + 1);
-              axis1.rest = (2 * axis1.step_delay + axis1.rest) % (4 * axis1.n + 1)
+              axis1.step_delay = axis1.step_delay - (2 * axis1.step_delay /*+ axis1.rest */) / (4 * axis1.n + 1);
+              // axis1.rest = (2 * axis1.step_delay + axis1.rest) % (4 * axis1.n + 1);
 
               // If we reach max speed by checkig if the calculated delay is smaller that the one we calculated with the max speed
               if (axis1.step_delay <=  axis1.min_delay)
@@ -194,7 +195,8 @@ void TC3_Handler()
               if(axis1.n!=0)
               {
                      axis1.step_delay = ( axis1.step_delay * (4 * axis1.n + 1)) / (4 * axis1.n + 1 - 2); // THis is the same as the other equation but inverted
-                     axis1.rest = ( axis1.step_delay * (4 * axis1.n + 1)) % (4 * axis1.n + 1 - 2)
+                     
+                     // axis1.rest = ( axis1.step_delay * (4 * axis1.n + 1)) % (4 * axis1.n + 1 - 2);
               }
        }
        TC1->TC_CHANNEL[0].TC_RC = axis1.step_delay;
