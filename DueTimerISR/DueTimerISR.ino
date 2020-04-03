@@ -262,12 +262,21 @@ void TC4_Handler()
 void setup()
 {
        Serial.begin(115200);
+
        pinMode(PIN_Z_ENABLE, OUTPUT);
        pinMode(PIN_Z_DIR, OUTPUT);
        pinMode(PIN_Z_STEP, OUTPUT);
+
+       pinMode(PIN_Y_ENABLE, OUTPUT);
+       pinMode(PIN_Y_DIR, OUTPUT);
+       pinMode(PIN_Y_STEP, OUTPUT);
+
        delay(3000);
+
+
        Serial.println("Starting timer..");
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 0, /*TC3 interrupt nested vector controller*/ TC3_IRQn, /*Frequency in hz*/ T1_FREQ);
+       configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 1, /*TC3 interrupt nested vector controller*/ TC4_IRQn, /*Frequency in hz*/ T1_FREQ);
 
        // Axis 1
        axis1.enable_pin     = PIN_Z_ENABLE;
@@ -289,7 +298,7 @@ void setup()
 
        axis2.goal_pos = 10000;
        axis2.goal_acc = 25; // MAX FOR THIS AXIS
-       axis2.goal_vel = 100; // MAX for this axis
+       axis2.goal_vel = 500; // MAX for this axis
 
        axis2.tc = TC1;
        axis2.channel = 1;
@@ -300,6 +309,7 @@ void loop()
 {
        // speed_cntr_Move(axis1.goal_pos,axis1.goal_acc, axis1.goal_vel);
        speed_cntr_Move(axis1);
+       speed_cntr_Move(axis2);
 
        do
        {
