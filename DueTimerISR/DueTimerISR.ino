@@ -35,19 +35,24 @@
 #define DECEL 2
 #define RUN 3
 
-// Direction of stepper motor movement
+// Direction of stepper axis1 movement
 #define CW -1
 #define CCW 1
 
 typedef struct
 {
+       // Axis specs
+       int goal_pos;
+       int goal_vel;
+       int goal_acc;
+
        // Hardware declarations
        uint8_t enable_pin;
        uint8_t step_pin;
        uint8_t dir_pin;
 
        // Motor status at any given time
-       unsigned char dir : 1;       //! Direction stepper motor should move.
+       unsigned char dir : 1;       //! Direction stepper axis1 should move.
        int          step_position;
        unsigned char running;
        unsigned int step_count;
@@ -61,11 +66,8 @@ typedef struct
        
 } speedRampData;
 
-speedRampData motor;
-
-int pos = 50000;
-int acc = 5;
-int vel = 500;
+speedRampData axis1;
+speedRampData axis2;
 
 void startTimer()
 {
@@ -117,30 +119,31 @@ void configureTimer(Tc *tc, uint32_t channel, IRQn_Type irq, uint32_t frequency)
 
 int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
 {
-       motor.dir = steps > 0 ? CCW : CW;                // Save the direction state 
-       digitalWrite(motor.dir_pin,steps>0?HIGH:LOW);        // Set the direction depending on the steps
-       motor.total_steps = abs(steps);                  // Change the sign of the steps to positive
+       axis1.dir = steps > 0 ? CCW : CW;                // Save the direction state 
+       digitalWrite(axis1.dir_pin,steps>0?HIGH:LOW);        // Set the direction depending on the steps
+       axis1.total_steps = abs(steps);                  // Change the sign of the steps to positive
        if(accel == 0){                                  // If we get zero acceleration get out.
               return false;
        }
        // CALCULATE ACCELERATION C0
-       motor.step_delay = T1_FREQ*sqrt((float)2/accel);        // We save the acceleration to the first step delay. (NEEDS CHANGING)
-       motor.step_count = 0;                            // Initialize the step count to zero 
-       motor.n = 0;                                     // Set the ramp counter to zero.
+       axis1.step_delay = T1_FREQ*sqrt((float)2/accel);        // We save the acceleration to the first step delay. (NEEDS CHANGING)
+       axis1.step_count = 0;                            // Initialize the step count to zero 
+       axis1.n = 0;                                     // Set the ramp counter to zero.
        if(speed == 0){                                  // If we input zero speed get out.
               return false;
        }
        // CALCULATE SPEED MIN_DELAY
-       motor.min_delay = T1_FREQ / speed;               // Set the minumum delay needed for the speed given
-       motor.rampUpStepCount = 0;                       // Set the ramp counter to zero. Is it not the same as n??
-       motor.running = true;                            // Set the motor status to running
-       TC1->TC_CHANNEL[0].TC_RC = motor.step_delay;     // Set counter ragister to the starting delay (acceleration)
-       digitalWrite(motor.enable_pin,LOW);                  // Enable stepper motor
+       axis1.min_delay = T1_FREQ / speed;               // Set the minumum delay needed for the speed given
+       axis1.rampUpStepCount = 0;                       // Set the ramp counter to zero. Is it not the same as n??
+       axis1.running = true;                            // Set the axis1 status to running
+       axis1.rest = 0;
+       TC1->TC_CHANNEL[0].TC_RC = axis1.step_delay;     // Set counter ragister to the starting delay (acceleration)
+       digitalWrite(axis1.enable_pin,LOW);                  // Enable stepper axis1
        startTimer();                                    // Start the timer
 
-       Serial.println("Min delay:"    +String(motor.min_delay));
-       Serial.println("Start delay:"  +String(motor.step_delay));
-       Serial.println("Total steps:"  +String(motor.total_steps));
+       Serial.println("Min delay:"    +String(axis1.min_delay));
+       Serial.println("Start delay:"  +String(axis1.step_delay));
+       Serial.println("Total steps:"  +String(axis1.total_steps));
 
        Serial.println("Desired position:" +String(steps));
        Serial.println("Acceleration:"     +String(accel));
@@ -150,49 +153,51 @@ int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
 void TC3_Handler()
 {
        TC_GetStatus(TC1, 0);               // Timer 1 channel 0 ----> TC3 it also clear the flag
-       if (motor.step_count <= motor.total_steps)
+       if (axis1.step_count <= axis1.total_steps)
        {
-              digitalWrite(motor.step_pin, HIGH);
-              digitalWrite(motor.step_pin, LOW);
-              motor.step_count++;
-              motor.step_position += motor.dir;
+              digitalWrite(axis1.step_pin, HIGH);
+              digitalWrite(axis1.step_pin, LOW);
+              axis1.step_count++;
+              axis1.step_position += axis1.dir;
        }
 
-       if(motor.step_count > motor.total_steps) // If we step more that the total it means we have already finished
+       if(axis1.step_count > axis1.total_steps) // If we step more that the total it means we have already finished
        {
-              motor.running = false;
-              digitalWrite(motor.enable_pin,HIGH);
+              axis1.running = false;
+              digitalWrite(axis1.enable_pin,HIGH);
               stopTimer();
        }
 
-       if (motor.rampUpStepCount == 0) // If we are ramping up 
+       if (axis1.rampUpStepCount == 0) // If we are ramping up 
        { 
               // Calculate next delays 
-              motor.n++;    
-              motor.step_delay = motor.step_delay - (2 * motor.step_delay) / (4 * motor.n + 1);
+              axis1.n++;    
+              axis1.step_delay = axis1.step_delay - (2 * axis1.step_delay + axis1.rest) / (4 * axis1.n + 1);
+              axis1.rest = (2 * axis1.step_delay + axis1.rest) % (4 * axis1.n + 1)
 
               // If we reach max speed by checkig if the calculated delay is smaller that the one we calculated with the max speed
-              if (motor.step_delay <=  motor.min_delay)
+              if (axis1.step_delay <=  axis1.min_delay)
               { 
-                     motor.step_delay = motor.min_delay;       // We saturate it to that minimum delay 
-                     motor.rampUpStepCount = motor.step_count; // We save the number of steps it took to reach this speed
+                     axis1.step_delay = axis1.min_delay;       // We saturate it to that minimum delay 
+                     axis1.rampUpStepCount = axis1.step_count; // We save the number of steps it took to reach this speed
               }
               // If istead we manage to reach half way without reaching full speed we have to start decelerating 
-              if (motor.step_count >= motor.total_steps / 2)
+              if (axis1.step_count >= axis1.total_steps / 2)
               { 
-                     motor.rampUpStepCount = motor.step_count; // So we save the number of steps it took to accelerate to this speed 
+                     axis1.rampUpStepCount = axis1.step_count; // So we save the number of steps it took to accelerate to this speed 
               }
        }
        // If we dont have to ramp down yet (we shoudl be in eather run or acelerating)
-       else if (motor.step_count >= motor.total_steps - motor.rampUpStepCount)
+       else if (axis1.step_count >= axis1.total_steps - axis1.rampUpStepCount)
        { 
-              motor.n--;
-              if(motor.n!=0)
+              axis1.n--;
+              if(axis1.n!=0)
               {
-                     motor.step_delay = ( motor.step_delay * (4 * motor.n + 1)) / (4 * motor.n + 1 - 2); // THis is the same as the other equation but inverted
+                     axis1.step_delay = ( axis1.step_delay * (4 * axis1.n + 1)) / (4 * axis1.n + 1 - 2); // THis is the same as the other equation but inverted
+                     axis1.rest = ( axis1.step_delay * (4 * axis1.n + 1)) % (4 * axis1.n + 1 - 2)
               }
        }
-       TC1->TC_CHANNEL[0].TC_RC = motor.step_delay;
+       TC1->TC_CHANNEL[0].TC_RC = axis1.step_delay;
 }
 
 void setup()
@@ -206,22 +211,26 @@ void setup()
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 0, /*TC3 interrupt nested vector controller*/ TC3_IRQn, /*Frequency in hz*/ T1_FREQ);
 
 
-       motor.enable_pin     = PIN_Z_ENABLE;
-       motor.step_pin       = PIN_Z_STEP;
-       motor.dir_pin        = PIN_Z_DIR;
+       axis1.enable_pin     = PIN_Z_ENABLE;
+       axis1.step_pin       = PIN_Z_STEP;
+       axis1.dir_pin        = PIN_Z_DIR;
+
+       axis1.goal_pos = 50000;
+       axis1.goal_acc = 20;
+       axis1.goal_vel = 20000;
 }
 
 void loop()
 {
-       speed_cntr_Move(pos, acc, vel);
+       speed_cntr_Move(axis1.goal_pos,axis1.goal_acc, axis1.goal_vel);
        do
        {
-              Serial.println(" n:"            + String(motor.n)              +
-                             " step:"         + String(motor.step_count)     +
-                             " running:"      + String(motor.running)        +
-                             " step_pos:"     + String(motor.step_position)  +
-                             " step_delay:"   + String(motor.step_delay));
-       }while(motor.running == true);
+              Serial.println(" n:"            + String(axis1.n)              +
+                             " step:"         + String(axis1.step_count)     +
+                             " running:"      + String(axis1.running)        +
+                             " step_pos:"     + String(axis1.step_position)  +
+                             " step_delay:"   + String(axis1.step_delay));
+       }while(axis1.running == true);
        Serial.println("Finished movement");
 
        // Stay there
