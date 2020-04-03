@@ -41,15 +41,24 @@
 
 typedef struct
 {
+       // Hardware declarations
+       uint8_t enable_pin;
+       uint8_t step_pin;
+       uint8_t dir_pin;
+
+       // Motor status at any given time
        unsigned char dir : 1;       //! Direction stepper motor should move.
+       int          step_position;
+       unsigned char running : true;
+       unsigned int step_count;
+       
+       // Interrupt variables
        unsigned int step_delay;     //! Peroid of next timer delay. At start this value set the accelration rate c0.
        unsigned int min_delay;      //! Minimum time delay (max speed)
        signed int n;                //! Counter used when accelerateing/decelerateing to calculate step_delay.
-       unsigned char running : true;
        unsigned int rampUpStepCount;
        unsigned int total_steps;
-       unsigned int step_count;
-       int          step_position;
+       
 } speedRampData;
 
 speedRampData motor;
@@ -109,7 +118,7 @@ void configureTimer(Tc *tc, uint32_t channel, IRQn_Type irq, uint32_t frequency)
 int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
 {
        motor.dir = steps > 0 ? CCW : CW;                // Save the direction state 
-       digitalWrite(PIN_Z_DIR,steps>0?HIGH:LOW);        // Set the direction depending on the steps
+       digitalWrite(motor.dir_pin,steps>0?HIGH:LOW);        // Set the direction depending on the steps
        motor.total_steps = abs(steps);                  // Change the sign of the steps to positive
        if(accel == 0){                                  // If we get zero acceleration get out.
               return false;
@@ -126,7 +135,7 @@ int speed_cntr_Move(signed int steps, unsigned int accel, unsigned int speed)
        motor.rampUpStepCount = 0;                       // Set the ramp counter to zero. Is it not the same as n??
        motor.running = true;                            // Set the motor status to running
        TC1->TC_CHANNEL[0].TC_RC = motor.step_delay;     // Set counter ragister to the starting delay (acceleration)
-       digitalWrite(PIN_Z_ENABLE,LOW);                  // Enable stepper motor
+       digitalWrite(motor.enable_pin,LOW);                  // Enable stepper motor
        startTimer();                                    // Start the timer
 
        Serial.println("Min delay:"    +String(motor.min_delay));
@@ -144,15 +153,15 @@ void TC3_Handler()
 
        if (motor.step_count < motor.total_steps)
        {
-              digitalWrite(PIN_Z_STEP, HIGH);
-              digitalWrite(PIN_Z_STEP, LOW);
+              digitalWrite(motor.step_pin, HIGH);
+              digitalWrite(motor.step_pin, LOW);
               motor.step_count++;
               motor.step_position += motor.dir;
        }
        else // If we step more that the total it means we have already finished
        {
               motor.running = false;
-              digitalWrite(PIN_Z_ENABLE,HIGH);
+              digitalWrite(motor.enable_pin,HIGH);
               stopTimer();
        }
 
@@ -192,6 +201,11 @@ void setup()
        delay(3000);
        Serial.println("Starting timer..");
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 0, /*TC3 interrupt nested vector controller*/ TC3_IRQn, /*Frequency in hz*/ T1_FREQ);
+
+
+       motor.enable_pin     = PIN_Z_ENABLE;
+       motor.step_pin       = PIN_Z_STEP;
+       motor.dir_pin        = PIN_Z_DIR;
 }
 
 void loop()
