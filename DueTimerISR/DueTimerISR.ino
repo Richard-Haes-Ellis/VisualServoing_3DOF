@@ -77,7 +77,7 @@ typedef struct
        
 } speedRampData;
 
-speedRampData axes[2];
+speedRampData axes[3];
 
 StaticJsonDocument<75> doc;
 
@@ -136,6 +136,8 @@ void configureTimer(Tc *tc, uint32_t channel, IRQn_Type irq, uint32_t frequency)
 
 int planMovement(speedRampData &axis)
 {
+       int code = 0;
+
        // Direction stuff
        axis.dir = axis.goal_pos > 0 ? CCW : CW;                // Save the direction state 
        digitalWrite(axis.dir_pin,axis.goal_pos>0?HIGH:LOW);    // Set the direction depending on the steps
@@ -157,6 +159,9 @@ int planMovement(speedRampData &axis)
        {
               axis.goal_exec_time = minTime;
               axis.speed = axis.max_vel;
+              // CALCULATE ESTIMATED TIME
+
+              code = 2;
        }
        else // If we have time to do it then we can recalculate the maximum speed
        {
@@ -165,6 +170,7 @@ int planMovement(speedRampData &axis)
               if(_4ac > _bsq){Serial.println("Failed due to complex root.");return -1;}
               float speed  = (axis.goal_exec_time - sqrt(_bsq-_4ac))*(float)axis.max_acc*0.5;
               axis.speed = speed;
+              code = 1;
               
        }
 
@@ -184,9 +190,9 @@ int planMovement(speedRampData &axis)
        digitalWrite(axis.enable_pin,LOW);                  // Enable stepper axis
 
        // Start 
-       startTimer(axis.tc,axis.channel,axis.irq);                                    // Start the timer
-       timer1 = millis();
+       // startTimer(axis.tc,axis.channel,axis.irq);                                    // Start the timer
 
+       /*
        Serial.println("Min delay:"    +String(axis.min_delay));
        Serial.println("Start delay:"  +String(axis.step_delay_f));
        Serial.println("Total steps:"  +String(axis.total_steps));
@@ -194,10 +200,62 @@ int planMovement(speedRampData &axis)
        Serial.println("Desired position:" +String(axis.goal_pos));
        Serial.println("Acceleration:"     +String(axis.max_acc));
        Serial.println("Max velocity:"     +String(axis.max_vel));
-       return 1;
+       */
+       return code; // Returns eather a 1 or 2 if time constraint is plauseble or not respectively
+       // If 2 is returned global planner must adjust all other times to coordinate properly
 }
 
 void TC3_Handler()
+{
+       TC_GetStatus(axes[0].tc, axes[0].channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
+       if (axes[0].step_count <= axes[0].total_steps)
+       {
+              digitalWrite(axes[0].step_pin, HIGH);
+              digitalWrite(axes[0].step_pin, LOW);
+              axes[0].step_count++;
+              axes[0].step_position += axes[0].dir;
+       }
+
+       if(axes[0].step_count > axes[0].total_steps) // If we step more that the total it means we have already finished
+       {
+              axes[0].running = false;
+              digitalWrite(axes[0].enable_pin,HIGH);
+              stopTimer(axes[0].tc,axes[0].channel,axes[0].irq);
+       }
+
+       if (axes[0].rampUpStepCount == 0) // If we are ramping up 
+       { 
+              // Calculate next delays 
+              axes[0].n++;    
+              axes[0].step_delay_f = axes[0].step_delay_f - (2 * axes[0].step_delay_f /*+ axes[0].rest */) / (4 * axes[0].n + 1);
+
+              // If we reach max speed by checkig if the calculated delay is smaller that the one we calculated with the max speed
+              if (axes[0].step_delay_f <=  (float)axes[0].min_delay)
+              { 
+                     axes[0].step_delay_f = axes[0].min_delay;       // We saturate it to that minimum delay 
+                     axes[0].rampUpStepCount = axes[0].step_count; // We save the number of steps it took to reach this speed
+              }
+              // If istead we manage to reach half way without reaching full speed we have to start decelerating 
+              if (axes[0].step_count >= (axes[0].total_steps / 2))
+              { 
+                     axes[0].rampUpStepCount = axes[0].step_count; // So we save the number of steps it took to accelerate to this speed 
+              }
+       }
+       // If we dont have to ramp down yet (we shoudl be in eather run or acelerating)
+       else if (axes[0].step_count >= axes[0].total_steps - axes[0].rampUpStepCount)
+       { 
+              if(axes[0].n!=0)
+              {
+                     axes[0].step_delay_f = ( axes[0].step_delay_f * (4 * axes[0].n + 1)) / (4 * axes[0].n + 1 - 2); // THis is the same as the other equation but inverted
+                     
+              }
+              axes[0].n--;
+       }
+       axes[0].step_delay = axes[0].step_delay_f;
+       axes[0].tc->TC_CHANNEL[axes[0].channel].TC_RC = axes[0].step_delay;
+}
+
+void TC4_Handler()
 {
        TC_GetStatus(axes[1].tc, axes[1].channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
        if (axes[1].step_count <= axes[1].total_steps)
@@ -247,7 +305,7 @@ void TC3_Handler()
        axes[1].tc->TC_CHANNEL[axes[1].channel].TC_RC = axes[1].step_delay;
 }
 
-void TC4_Handler()
+void TC5_Handler()
 {
        TC_GetStatus(axes[2].tc, axes[2].channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
        if (axes[2].step_count <= axes[2].total_steps)
@@ -297,6 +355,7 @@ void TC4_Handler()
        axes[2].tc->TC_CHANNEL[axes[2].channel].TC_RC = axes[2].step_delay;
 }
 
+
 void setup()
 {
        Serial.begin(115200);
@@ -309,39 +368,56 @@ void setup()
        pinMode(PIN_Y_DIR, OUTPUT);
        pinMode(PIN_Y_STEP, OUTPUT);
 
+       pinMode(PIN_X_ENABLE, OUTPUT);
+       pinMode(PIN_X_DIR, OUTPUT);
+       pinMode(PIN_X_STEP, OUTPUT);
+
        delay(3000);
 
 
        Serial.println("Starting timer..");
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 0, /*TC3 interrupt nested vector controller*/ TC3_IRQn, /*Frequency in hz*/ T1_FREQ);
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 1, /*TC3 interrupt nested vector controller*/ TC4_IRQn, /*Frequency in hz*/ T1_FREQ);
+       configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 2, /*TC3 interrupt nested vector controller*/ TC5_IRQn, /*Frequency in hz*/ T1_FREQ);
 
        // Axis 1
-       axes[1].enable_pin     = PIN_Z_ENABLE;
-       axes[1].step_pin       = PIN_Z_STEP;
-       axes[1].dir_pin        = PIN_Z_DIR;
+       axes[0].enable_pin     = PIN_Z_ENABLE;
+       axes[0].step_pin       = PIN_Z_STEP;
+       axes[0].dir_pin        = PIN_Z_DIR;
 
-       axes[1].goal_pos = 80000;
-       axes[1].max_acc = 70000; // Up to 70k is fine 
-       axes[1].max_vel = 30000; // 30k is the max
-       axes[1].goal_exec_time = 6;
+       axes[0].goal_pos = 80000;
+       axes[0].max_acc = 70000; // Up to 70k is fine 
+       axes[0].max_vel = 30000; // 30k is the max
 
-       axes[1].tc = TC1;
-       axes[1].channel = 0;
-       axes[1].irq = TC3_IRQn;
+       axes[0].tc = TC1;
+       axes[0].channel = 0;
+       axes[0].irq = TC3_IRQn;
 
        // Axis 2
-       axes[2].enable_pin     = PIN_Y_ENABLE;
-       axes[2].step_pin       = PIN_Y_STEP;
-       axes[2].dir_pin        = PIN_Y_DIR;
+       axes[1].enable_pin     = PIN_Y_ENABLE;
+       axes[1].step_pin       = PIN_Y_STEP;
+       axes[1].dir_pin        = PIN_Y_DIR;
 
-       axes[2].goal_pos = 10000;
-       axes[2].max_acc = 25; // MAX FOR THIS AXIS
-       axes[2].max_vel = 500; // MAX for this axes
+       axes[1].goal_pos = 10000;
+       axes[1].max_acc = 70000; // MAX FOR THIS AXIS
+       axes[1].max_vel = 30000; // MAX for this axes
+
+       axes[1].tc = TC1;
+       axes[1].channel = 1;
+       axes[1].irq = TC4_IRQn;
+
+       // Axis 3
+       axes[2].enable_pin     = PIN_X_ENABLE;
+       axes[2].step_pin       = PIN_X_STEP;
+       axes[2].dir_pin        = PIN_X_DIR;
+
+       axes[2].goal_pos = 5000;
+       axes[2].max_acc = 70000; // MAX FOR THIS AXIS
+       axes[2].max_vel = 30000; // MAX for this axes
 
        axes[2].tc = TC1;
-       axes[2].channel = 1;
-       axes[2].irq = TC4_IRQn;
+       axes[2].channel = 2;
+       axes[2].irq = TC5_IRQn;
 }
 
 void startMovement(speedRampData axis[],uint numAxis)
@@ -353,17 +429,32 @@ void startMovement(speedRampData axis[],uint numAxis)
 
 void loop()
 {
-       // speed_cntr_Move(axis1.goal_pos,axis1.goal_acc, axis1.goal_vel);
+       axes[0].goal_exec_time = 3;
+       axes[1].goal_exec_time = 3;
+       axes[2].goal_exec_time = 3;
+      
+       planMovement(axes[0]);
        planMovement(axes[1]);
-       while(axes[1].running);
-       timer2 = millis();
-       Serial.println("Finished movement in: " + String(timer2 - timer1) + " ms");
+       planMovement(axes[2]);
+       startMovement(axes,3);
+       while(axes[0].running);
+
+       axes[0].goal_pos=-axes[0].goal_pos;
+       axes[0].goal_exec_time = 3;
+
        axes[1].goal_pos=-axes[1].goal_pos;
-       axes[1].goal_exec_time = 10;
+       axes[1].goal_exec_time = 3;
+
+       axes[2].goal_pos=-axes[2].goal_pos;
+       axes[2].goal_exec_time = 3;
+       
+       planMovement(axes[0]);
        planMovement(axes[1]);
-       while(axes[1].running);
-       timer2 = millis();
-       Serial.println("Finished eovement in: " + String(timer2 - timer1) + " ms");
+       planMovement(axes[2]);
+       startMovement(axes,3);
+       while(axes[0].running);
+
+       
        // speed_cntr_Move(axis2);
 
        // do
