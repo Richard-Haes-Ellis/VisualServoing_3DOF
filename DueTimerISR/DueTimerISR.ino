@@ -1,5 +1,7 @@
+#include <ArduinoJson.h>
+
 #define SPR 1600
-#define T1_FREQ 1000000
+#define T1_FREQ 656250
 
 // Maths constants. To simplify maths when calculating in speed_cntr_Move().
 #define ALPHA (2 * 3.14159 / SPR)                    // 2*pi/spr
@@ -43,8 +45,9 @@ typedef struct
 {
        // Axis specs
        int goal_pos;
-       int goal_vel;
-       int goal_acc;
+       int max_vel;
+       int max_acc;
+       float goal_exec_time;
 
        // Hardware declarations
        uint8_t enable_pin;
@@ -55,6 +58,7 @@ typedef struct
        volatile uint8_t dir;       //! Direction stepper axis1 should move.
        volatile uint32_t step_position;
        volatile uint8_t running;
+       volatile uint32_t speed;
        
        // Interrupt variables
        volatile uint32_t step_count;
@@ -73,8 +77,14 @@ typedef struct
        
 } speedRampData;
 
-speedRampData axis1;
-speedRampData axis2;
+speedRampData axes[2];
+
+StaticJsonDocument<75> doc;
+
+char data[100];
+
+int timer1=0,prv_timer0,elapsed=0;
+int timer2=0;
 
 void startTimer(Tc *tc, uint32_t channel, IRQn_Type irq)
 {
@@ -105,10 +115,10 @@ void configureTimer(Tc *tc, uint32_t channel, IRQn_Type irq, uint32_t frequency)
                     channel,      // Channel
                     TC_CMR_WAVE | // Wave form is enabled
                         TC_CMR_WAVSEL_UP_RC |
-                        TC_CMR_TCCLKS_TIMER_CLOCK1 // Settings
+                        TC_CMR_TCCLKS_TIMER_CLOCK4 // Settings
        );
 
-       uint32_t rc = VARIANT_MCK / 2 / frequency; //128 because we selected TIMER_CLOCK4 above
+       uint32_t rc = VARIANT_MCK / 128 / frequency; //128 because we selected TIMER_CLOCK4 above
 
        tc->TC_CHANNEL[channel].TC_RC = rc; //TC_SetRC(tc, channel, rc);
        // TC_Start(tc, channel);
@@ -124,139 +134,167 @@ void configureTimer(Tc *tc, uint32_t channel, IRQn_Type irq, uint32_t frequency)
        // NVIC_EnableIRQ(irq);
 }
 
-int speed_cntr_Move(speedRampData &axis)
+int planMovement(speedRampData &axis)
 {
+       // Direction stuff
        axis.dir = axis.goal_pos > 0 ? CCW : CW;                // Save the direction state 
        digitalWrite(axis.dir_pin,axis.goal_pos>0?HIGH:LOW);    // Set the direction depending on the steps
+
+       // Acceleraton stuff
        axis.total_steps = abs(axis.goal_pos);                  // Change the sign of the steps to positive
-       if(axis.goal_acc == 0){                                  // If we get zero acceleration get out.
-              return false;
+       if(axis.max_acc == 0){                                  // If we get zero acceleration get out.
+              return -1;
        }
-       // CALCULATE ACCELERATION C0
-       axis.step_delay_f = (float)T1_FREQ_148*sqrt((float)2/axis.goal_acc);        // We save the acceleration to the first step delay. (NEEDS CHANGING)
+       axis.step_delay_f = (float)T1_FREQ_148*sqrt((float)2/axis.max_acc);        // We save the acceleration to the first step delay. (NEEDS CHANGING)
        axis.step_delay = axis.step_delay_f;
+
+       // Velocity stuff
+       float minTime = 2*axis.max_vel/axis.max_acc; // Worst case scenario we only accelerate and decelerate. 
+       if(axis.max_vel == 0){                                  // If we input zero speed get out.
+              return -1;
+       }
+       if(axis.goal_exec_time<=minTime) // We dont have enough time to do that movement, we will return the actual time we will take.
+       {
+              axis.goal_exec_time = minTime;
+              axis.speed = axis.max_vel;
+       }
+       else // If we have time to do it then we can recalculate the maximum speed
+       {
+              float _4ac = (4.0*(float)axis.total_steps)/(float)axis.max_acc;
+              float _bsq = axis.goal_exec_time*axis.goal_exec_time;
+              if(_4ac > _bsq){Serial.println("Failed due to complex root.");return -1;}
+              float speed  = (axis.goal_exec_time - sqrt(_bsq-_4ac))*(float)axis.max_acc*0.5;
+              axis.speed = speed;
+              
+       }
+
+       // CALCULATE SPEED MIN_DELAY
+       axis.min_delay = T1_FREQ / axis.speed;               // Set the minumum delay needed for the speed given
+
+       // Inner calcualtion variables
        axis.step_count = 0;                            // Initialize the step count to zero 
        axis.n = 0;                                     // Set the ramp counter to zero.
-       if(axis.goal_vel == 0){                                  // If we input zero speed get out.
-              return false;
-       }
-       // CALCULATE SPEED MIN_DELAY
-       axis.min_delay = T1_FREQ / axis.goal_vel;               // Set the minumum delay needed for the speed given
        axis.rampUpStepCount = 0;                       // Set the ramp counter to zero. Is it not the same as n??
        axis.running = true;                            // Set the axis status to running
-       axis.rest = 0;
+
+       // Register stuff
        TC1->TC_CHANNEL[0].TC_RC = axis.step_delay;     // Set counter ragister to the starting delay (acceleration)
+
+       // Enable motor
        digitalWrite(axis.enable_pin,LOW);                  // Enable stepper axis
+
+       // Start 
        startTimer(axis.tc,axis.channel,axis.irq);                                    // Start the timer
+       timer1 = millis();
 
        Serial.println("Min delay:"    +String(axis.min_delay));
-       Serial.println("Start delay:"  +String(axis.step_delay));
+       Serial.println("Start delay:"  +String(axis.step_delay_f));
        Serial.println("Total steps:"  +String(axis.total_steps));
 
        Serial.println("Desired position:" +String(axis.goal_pos));
-       Serial.println("Acceleration:"     +String(axis.goal_acc));
-       Serial.println("Max velocity:"     +String(axis.goal_vel));
+       Serial.println("Acceleration:"     +String(axis.max_acc));
+       Serial.println("Max velocity:"     +String(axis.max_vel));
        return 1;
 }
 
 void TC3_Handler()
 {
-       TC_GetStatus(axis1.tc, axis1.channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
-       if (axis1.step_count <= axis1.total_steps)
+       TC_GetStatus(axes[1].tc, axes[1].channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
+       if (axes[1].step_count <= axes[1].total_steps)
        {
-              digitalWrite(axis1.step_pin, HIGH);
-              digitalWrite(axis1.step_pin, LOW);
-              axis1.step_count++;
-              axis1.step_position += axis1.dir;
+              digitalWrite(axes[1].step_pin, HIGH);
+              digitalWrite(axes[1].step_pin, LOW);
+              axes[1].step_count++;
+              axes[1].step_position += axes[1].dir;
        }
 
-       if(axis1.step_count > axis1.total_steps) // If we step more that the total it means we have already finished
+       if(axes[1].step_count > axes[1].total_steps) // If we step more that the total it means we have already finished
        {
-              axis1.running = false;
-              digitalWrite(axis1.enable_pin,HIGH);
-              stopTimer(axis1.tc,axis1.channel,axis1.irq);
+              axes[1].running = false;
+              digitalWrite(axes[1].enable_pin,HIGH);
+              stopTimer(axes[1].tc,axes[1].channel,axes[1].irq);
        }
 
-       if (axis1.rampUpStepCount == 0) // If we are ramping up 
+       if (axes[1].rampUpStepCount == 0) // If we are ramping up 
        { 
               // Calculate next delays 
-              axis1.n++;    
-              axis1.step_delay_f = axis1.step_delay_f - (2 * axis1.step_delay_f /*+ axis1.rest */) / (4 * axis1.n + 1);
+              axes[1].n++;    
+              axes[1].step_delay_f = axes[1].step_delay_f - (2 * axes[1].step_delay_f /*+ axes[1].rest */) / (4 * axes[1].n + 1);
 
               // If we reach max speed by checkig if the calculated delay is smaller that the one we calculated with the max speed
-              if (axis1.step_delay_f <=  (float)axis1.min_delay)
+              if (axes[1].step_delay_f <=  (float)axes[1].min_delay)
               { 
-                     axis1.step_delay_f = axis1.min_delay;       // We saturate it to that minimum delay 
-                     axis1.rampUpStepCount = axis1.step_count; // We save the number of steps it took to reach this speed
+                     axes[1].step_delay_f = axes[1].min_delay;       // We saturate it to that minimum delay 
+                     axes[1].rampUpStepCount = axes[1].step_count; // We save the number of steps it took to reach this speed
               }
               // If istead we manage to reach half way without reaching full speed we have to start decelerating 
-              if (axis1.step_count >= (axis1.total_steps / 2))
+              if (axes[1].step_count >= (axes[1].total_steps / 2))
               { 
-                     axis1.rampUpStepCount = axis1.step_count; // So we save the number of steps it took to accelerate to this speed 
+                     axes[1].rampUpStepCount = axes[1].step_count; // So we save the number of steps it took to accelerate to this speed 
               }
        }
        // If we dont have to ramp down yet (we shoudl be in eather run or acelerating)
-       else if (axis1.step_count >= axis1.total_steps - axis1.rampUpStepCount)
+       else if (axes[1].step_count >= axes[1].total_steps - axes[1].rampUpStepCount)
        { 
-              if(axis1.n!=0)
+              if(axes[1].n!=0)
               {
-                     axis1.step_delay_f = ( axis1.step_delay_f * (4 * axis1.n + 1)) / (4 * axis1.n + 1 - 2); // THis is the same as the other equation but inverted
+                     axes[1].step_delay_f = ( axes[1].step_delay_f * (4 * axes[1].n + 1)) / (4 * axes[1].n + 1 - 2); // THis is the same as the other equation but inverted
                      
               }
-              axis1.n--;
+              axes[1].n--;
        }
-       axis1.step_delay = axis1.step_delay_f;
-       axis1.tc->TC_CHANNEL[axis1.channel].TC_RC = axis1.step_delay;
+       axes[1].step_delay = axes[1].step_delay_f;
+       axes[1].tc->TC_CHANNEL[axes[1].channel].TC_RC = axes[1].step_delay;
 }
 
 void TC4_Handler()
 {
-       TC_GetStatus(axis2.tc, axis2.channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
-       if (axis2.step_count <= axis2.total_steps)
+       TC_GetStatus(axes[2].tc, axes[2].channel);               // Timer 1 channel 0 ----> TC3 it also clear the flag
+       if (axes[2].step_count <= axes[2].total_steps)
        {
-              digitalWrite(axis2.step_pin, HIGH);
-              digitalWrite(axis2.step_pin, LOW);
-              axis2.step_count++;
-              axis2.step_position += axis2.dir;
+              digitalWrite(axes[2].step_pin, HIGH);
+              digitalWrite(axes[2].step_pin, LOW);
+              axes[2].step_count++;
+              axes[2].step_position += axes[2].dir;
        }
 
-       if(axis2.step_count > axis2.total_steps) // If we step more that the total it means we have already finished
+       if(axes[2].step_count > axes[2].total_steps) // If we step more that the total it means we have already finished
        {
-              axis2.running = false;
-              digitalWrite(axis2.enable_pin,HIGH);
-              stopTimer(axis2.tc,axis2.channel,axis2.irq);
+              axes[2].running = false;
+              digitalWrite(axes[2].enable_pin,HIGH);
+              stopTimer(axes[2].tc,axes[2].channel,axes[2].irq);
        }
 
-       if (axis2.rampUpStepCount == 0) // If we are ramping up 
+       if (axes[2].rampUpStepCount == 0) // If we are ramping up 
        { 
               // Calculate next delays 
-              axis2.n++;    
-              axis2.step_delay_f = axis2.step_delay_f - (2 * axis2.step_delay_f /*+ axis2.rest */) / (4 * axis2.n + 1);
+              axes[2].n++;    
+              axes[2].step_delay_f = axes[2].step_delay_f - (2 * axes[2].step_delay_f /*+ axes[2].rest */) / (4 * axes[2].n + 1);
 
               // If we reach max speed by checkig if the calculated delay is smaller that the one we calculated with the max speed
-              if (axis2.step_delay_f <=  (float)axis2.min_delay)
+              if (axes[2].step_delay_f <=  (float)axes[2].min_delay)
               { 
-                     axis2.step_delay_f = axis2.min_delay;       // We saturate it to that minimum delay 
-                     axis2.rampUpStepCount = axis2.step_count; // We save the number of steps it took to reach this speed
+                     axes[2].step_delay_f = axes[2].min_delay;       // We saturate it to that minimum delay 
+                     axes[2].rampUpStepCount = axes[2].step_count; // We save the number of steps it took to reach this speed
               }
               // If istead we manage to reach half way without reaching full speed we have to start decelerating 
-              if (axis2.step_count >= (axis2.total_steps / 2))
+              if (axes[2].step_count >= (axes[2].total_steps / 2))
               { 
-                     axis2.rampUpStepCount = axis2.step_count; // So we save the number of steps it took to accelerate to this speed 
+                     axes[2].rampUpStepCount = axes[2].step_count; // So we save the number of steps it took to accelerate to this speed 
               }
        }
        // If we dont have to ramp down yet (we shoudl be in eather run or acelerating)
-       else if (axis2.step_count >= axis2.total_steps - axis2.rampUpStepCount)
+       else if (axes[2].step_count >= axes[2].total_steps - axes[2].rampUpStepCount)
        { 
-              if(axis2.n!=0)
+              if(axes[2].n!=0)
               {
-                     axis2.step_delay_f = ( axis2.step_delay_f * (4 * axis2.n + 1)) / (4 * axis2.n + 1 - 2); // THis is the same as the other equation but inverted
+                     axes[2].step_delay_f = ( axes[2].step_delay_f * (4 * axes[2].n + 1)) / (4 * axes[2].n + 1 - 2); // THis is the same as the other equation but inverted
                      
               }
-              axis2.n--;
+              axes[2].n--;
        }
-       axis2.step_delay = axis2.step_delay_f;
-       axis2.tc->TC_CHANNEL[axis2.channel].TC_RC = axis2.step_delay;
+       axes[2].step_delay = axes[2].step_delay_f;
+       axes[2].tc->TC_CHANNEL[axes[2].channel].TC_RC = axes[2].step_delay;
 }
 
 void setup()
@@ -279,52 +317,66 @@ void setup()
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 1, /*TC3 interrupt nested vector controller*/ TC4_IRQn, /*Frequency in hz*/ T1_FREQ);
 
        // Axis 1
-       axis1.enable_pin     = PIN_Z_ENABLE;
-       axis1.step_pin       = PIN_Z_STEP;
-       axis1.dir_pin        = PIN_Z_DIR;
+       axes[1].enable_pin     = PIN_Z_ENABLE;
+       axes[1].step_pin       = PIN_Z_STEP;
+       axes[1].dir_pin        = PIN_Z_DIR;
 
-       axis1.goal_pos = 70000;
-       axis1.goal_acc = 25; // MAX FOR THIS AXIS
-       axis1.goal_vel = 1000; // MAX for this axis
+       axes[1].goal_pos = 80000;
+       axes[1].max_acc = 70000; // Up to 70k is fine 
+       axes[1].max_vel = 30000; // 30k is the max
+       axes[1].goal_exec_time = 6;
 
-       axis1.tc = TC1;
-       axis1.channel = 0;
-       axis1.irq = TC3_IRQn;
+       axes[1].tc = TC1;
+       axes[1].channel = 0;
+       axes[1].irq = TC3_IRQn;
 
        // Axis 2
-       axis2.enable_pin     = PIN_Y_ENABLE;
-       axis2.step_pin       = PIN_Y_STEP;
-       axis2.dir_pin        = PIN_Y_DIR;
+       axes[2].enable_pin     = PIN_Y_ENABLE;
+       axes[2].step_pin       = PIN_Y_STEP;
+       axes[2].dir_pin        = PIN_Y_DIR;
 
-       axis2.goal_pos = 10000;
-       axis2.goal_acc = 25; // MAX FOR THIS AXIS
-       axis2.goal_vel = 500; // MAX for this axis
+       axes[2].goal_pos = 10000;
+       axes[2].max_acc = 25; // MAX FOR THIS AXIS
+       axes[2].max_vel = 500; // MAX for this axes
 
-       axis2.tc = TC1;
-       axis2.channel = 1;
-       axis2.irq = TC4_IRQn;
+       axes[2].tc = TC1;
+       axes[2].channel = 1;
+       axes[2].irq = TC4_IRQn;
+}
+
+void startMovement(speedRampData axis[],uint numAxis)
+{
+       for(uint8_t i=0; i< numAxis;i++){
+              startTimer(axis[i].tc,axis[i].channel,axis[i].irq); 
+       }
 }
 
 void loop()
 {
        // speed_cntr_Move(axis1.goal_pos,axis1.goal_acc, axis1.goal_vel);
-       speed_cntr_Move(axis1);
-       speed_cntr_Move(axis2);
+       planMovement(axes[1]);
+       while(axes[1].running);
+       timer2 = millis();
+       Serial.println("Finished movement in: " + String(timer2 - timer1) + " ms");
+       axes[1].goal_pos=-axes[1].goal_pos;
+       axes[1].goal_exec_time = 10;
+       planMovement(axes[1]);
+       while(axes[1].running);
+       timer2 = millis();
+       Serial.println("Finished eovement in: " + String(timer2 - timer1) + " ms");
+       // speed_cntr_Move(axis2);
 
-       do
-       {
-              Serial.println(" n:"            + String(axis1.n)              +
-                             " step:"         + String(axis1.step_count)     +
-                             " running:"      + String(axis1.running)        +
-                             " step_pos:"     + String(axis1.step_position)  +
-                             " step_delay:"   + String(axis1.step_delay));
-       }while(axis1.running == true);
-       Serial.println("Finished movement");
-
-       // Stay there
-       while(1){
-
-       }
+       // do
+       // {
+       //        Serial.println(" n:" + String(axis1.n) +
+       //                       " step:" + String(axis1.step_count) +
+       //                       " running:" + String(axis1.running) +
+       //                       " step_pos:" + String(axis1.step_position) +
+       //                       " elapsed:" + String(elapsed) +
+       //                       " step_delay:" + String(axis1.step_delay));
+       // } while (axis1.running == true);
+       
+       while(true);
 }
 
 /* ARCHIVE

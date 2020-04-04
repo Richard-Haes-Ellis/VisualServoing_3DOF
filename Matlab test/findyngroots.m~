@@ -1,0 +1,16 @@
+clear all;
+clc;
+
+a = 70000;
+
+x = 100000;
+
+speed =[1000:30000];
+
+t = speed./a + x./speed;
+
+v
+
+plot(t,speed)
+xlabel("time");
+ylabel("speed");
