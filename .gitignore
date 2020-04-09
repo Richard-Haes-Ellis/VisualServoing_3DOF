@@ -1,1 +1,5 @@
 .vscode
+Arduino-due/.travis.yml
+Arduino-due/include/README
+Arduino-due/lib/README
+Arduino-due/test/README

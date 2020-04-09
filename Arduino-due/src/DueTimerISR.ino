@@ -1,5 +1,3 @@
-#include <ArduinoJson.h>
-
 #define SPR 1600
 #define T1_FREQ 656250
 
@@ -55,8 +53,8 @@ typedef struct
        uint8_t dir_pin;
 
        // Motor status at any given time
-       volatile uint8_t dir;       //! Direction stepper axis1 should move.
-       volatile uint32_t step_position;
+       volatile int8_t dir;       //! Direction stepper axis1 should move.
+       volatile int32_t step_position;
        volatile uint8_t running;
        volatile uint32_t speed;
        
@@ -68,7 +66,6 @@ typedef struct
        volatile uint32_t n;                //! Counter used when accelerateing/decelerateing to calculate step_delay.
        volatile uint32_t rampUpStepCount;
        volatile uint32_t total_steps;
-       volatile  int32_t rest;
 
        // Interrupt handler
        Tc *tc;
@@ -78,10 +75,6 @@ typedef struct
 } speedRampData;
 
 speedRampData axes[3];
-
-StaticJsonDocument<75> doc;
-
-char data[100];
 
 int timer1=0,prv_timer0,elapsed=0;
 int timer2=0;
@@ -140,6 +133,8 @@ int planMovement(speedRampData &axis)
 
        // Direction stuff
        axis.dir = axis.goal_pos > 0 ? CCW : CW;                // Save the direction state 
+
+       Serial.println("STEP DIRECTION IS:"+ String(axis.dir));
        digitalWrite(axis.dir_pin,axis.goal_pos>0?HIGH:LOW);    // Set the direction depending on the steps
 
        // Acceleraton stuff
@@ -376,6 +371,7 @@ void setup()
 
 
        Serial.println("Starting timer..");
+
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 0, /*TC3 interrupt nested vector controller*/ TC3_IRQn, /*Frequency in hz*/ T1_FREQ);
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 1, /*TC3 interrupt nested vector controller*/ TC4_IRQn, /*Frequency in hz*/ T1_FREQ);
        configureTimer(/*Timer TC1*/ TC1, /*Channel 0*/ 2, /*TC3 interrupt nested vector controller*/ TC5_IRQn, /*Frequency in hz*/ T1_FREQ);
@@ -384,11 +380,8 @@ void setup()
        axes[0].enable_pin     = PIN_Z_ENABLE;
        axes[0].step_pin       = PIN_Z_STEP;
        axes[0].dir_pin        = PIN_Z_DIR;
-
-       axes[0].goal_pos = 80000;
        axes[0].max_acc = 70000; // Up to 70k is fine 
        axes[0].max_vel = 30000; // 30k is the max
-
        axes[0].tc = TC1;
        axes[0].channel = 0;
        axes[0].irq = TC3_IRQn;
@@ -397,11 +390,8 @@ void setup()
        axes[1].enable_pin     = PIN_Y_ENABLE;
        axes[1].step_pin       = PIN_Y_STEP;
        axes[1].dir_pin        = PIN_Y_DIR;
-
-       axes[1].goal_pos = 10000;
        axes[1].max_acc = 70000; // MAX FOR THIS AXIS
        axes[1].max_vel = 30000; // MAX for this axes
-
        axes[1].tc = TC1;
        axes[1].channel = 1;
        axes[1].irq = TC4_IRQn;
@@ -410,11 +400,8 @@ void setup()
        axes[2].enable_pin     = PIN_X_ENABLE;
        axes[2].step_pin       = PIN_X_STEP;
        axes[2].dir_pin        = PIN_X_DIR;
-
-       axes[2].goal_pos = 5000;
        axes[2].max_acc = 70000; // MAX FOR THIS AXIS
        axes[2].max_vel = 30000; // MAX for this axes
-
        axes[2].tc = TC1;
        axes[2].channel = 2;
        axes[2].irq = TC5_IRQn;
@@ -429,43 +416,125 @@ void startMovement(speedRampData axis[],uint numAxis)
 
 void loop()
 {
-       axes[0].goal_exec_time = 3;
-       axes[1].goal_exec_time = 3;
-       axes[2].goal_exec_time = 3;
-      
+       // Movement 1
+       axes[0].goal_pos = 80000;
+       axes[1].goal_pos = 0;
+       axes[2].goal_pos = 0;
+       axes[0].goal_exec_time = 5;
+       axes[1].goal_exec_time = 5;
+       axes[2].goal_exec_time = 5;
        planMovement(axes[0]);
        planMovement(axes[1]);
        planMovement(axes[2]);
        startMovement(axes,3);
-       while(axes[0].running);
+       // End movment
+       Serial.println(" ");
+       Serial.println(" Movement 1");
+       Serial.println(" ");
+       while(axes[0].running || axes[1].running || axes[2].running)
+       {
+#ifdef DEBUG
+              Serial.print("Pos 1: "+String(axes[0].step_position));
+              Serial.print("\tPos 2: "+String(axes[1].step_position));
+              Serial.println("\tPos 3: "+String(axes[2].step_position));
+#endif
+       }
 
-       axes[0].goal_pos=-axes[0].goal_pos;
-       axes[0].goal_exec_time = 3;
-
-       axes[1].goal_pos=-axes[1].goal_pos;
-       axes[1].goal_exec_time = 3;
-
-       axes[2].goal_pos=-axes[2].goal_pos;
-       axes[2].goal_exec_time = 3;
-       
+       // Movement 2
+       axes[0].goal_pos= 60000  - axes[0].step_position;
+       axes[1].goal_pos= -2000  - axes[1].step_position;
+       axes[2].goal_pos= -2000  - axes[2].step_position;
+       axes[0].goal_exec_time = 2;
+       axes[1].goal_exec_time = 2;
+       axes[2].goal_exec_time = 2;
        planMovement(axes[0]);
        planMovement(axes[1]);
        planMovement(axes[2]);
        startMovement(axes,3);
-       while(axes[0].running);
+       // End movment
+       Serial.println(" ");
+       Serial.println(" Movement 2");
+       Serial.println(" ");
+       while(axes[0].running || axes[1].running || axes[2].running)
+       {
+#ifdef DEBUG
+              Serial.print("Pos 1: "+String(axes[0].step_position));
+              Serial.print("\tPos 2: "+String(axes[1].step_position));
+              Serial.println("\tPos 3: "+String(axes[2].step_position));
+#endif
+       }
 
-       
-       // speed_cntr_Move(axis2);
+       // Movement 3
+       axes[0].goal_pos = 40000 - axes[0].step_position;
+       axes[1].goal_pos = 2000  - axes[1].step_position;
+       axes[2].goal_pos = 5000  - axes[2].step_position;
+       axes[0].goal_exec_time = 2;
+       axes[1].goal_exec_time = 2;
+       axes[2].goal_exec_time = 2;
+       planMovement(axes[0]);
+       planMovement(axes[1]);
+       planMovement(axes[2]);
+       startMovement(axes,3);
+       // End movment
+       Serial.println(" ");
+       Serial.println(" Movement 3");
+       Serial.println(" ");
+       while(axes[0].running || axes[1].running || axes[2].running)
+       {
+#ifdef DEBUG
+              Serial.print("Pos 1: "+String(axes[0].step_position));
+              Serial.print("\tPos 2: "+String(axes[1].step_position));
+              Serial.println("\tPos 3: "+String(axes[2].step_position));
+#endif
+       }
 
-       // do
-       // {
-       //        Serial.println(" n:" + String(axis1.n) +
-       //                       " step:" + String(axis1.step_count) +
-       //                       " running:" + String(axis1.running) +
-       //                       " step_pos:" + String(axis1.step_position) +
-       //                       " elapsed:" + String(elapsed) +
-       //                       " step_delay:" + String(axis1.step_delay));
-       // } while (axis1.running == true);
+       // Movement 4
+       axes[0].goal_pos = 20000  - axes[0].step_position;
+       axes[1].goal_pos = -2000  - axes[1].step_position;
+       axes[2].goal_pos = -5000  - axes[2].step_position;
+       axes[0].goal_exec_time = 1.5;
+       axes[1].goal_exec_time = 1.5;
+       axes[2].goal_exec_time = 1.5;
+       planMovement(axes[0]);
+       planMovement(axes[1]);
+       planMovement(axes[2]);
+       startMovement(axes,3);
+       // End movment
+       Serial.println(" ");
+       Serial.println(" Movement 4");
+       Serial.println(" ");
+       while(axes[0].running || axes[1].running || axes[2].running)
+       {
+#ifdef DEBUG
+              Serial.print("Pos 1: "+String(axes[0].step_position));
+              Serial.print("\tPos 2: "+String(axes[1].step_position));
+              Serial.println("\tPos 3: "+String(axes[2].step_position));
+#endif
+       }
+
+       // Movement 5
+       axes[0].goal_pos = 0 - axes[0].step_position;
+       axes[1].goal_pos = 0  - axes[1].step_position;
+       axes[2].goal_pos = 0  - axes[2].step_position;
+       axes[0].goal_exec_time = 2;
+       axes[1].goal_exec_time = 2;
+       axes[2].goal_exec_time = 2;
+       planMovement(axes[0]);
+       planMovement(axes[1]);
+       planMovement(axes[2]);
+       startMovement(axes,3);
+       // End movment
+       Serial.println(" ");
+       Serial.println(" Movement 5");
+       Serial.println(" ");
+       while(axes[0].running || axes[1].running || axes[2].running)
+       {
+#ifdef DEBUG
+              Serial.print("Pos 1: "+String(axes[0].step_position));
+              Serial.print("\tPos 2: "+String(axes[1].step_position));
+              Serial.println("\tPos 3: "+String(axes[2].step_position));
+#endif
+       }   
        
        while(true);
 }
