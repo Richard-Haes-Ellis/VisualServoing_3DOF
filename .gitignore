@@ -3,3 +3,6 @@ Arduino-due/.travis.yml
 Arduino-due/include/README
 Arduino-due/lib/README
 Arduino-due/test/README
+Arduino-due-test/.travis.yml
+Arduino-due-test/test/README
+Arduino-due-test/lib/usbhost/README
