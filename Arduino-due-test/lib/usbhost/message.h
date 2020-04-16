@@ -32,7 +32,7 @@ void E_Notify(char const * msg, int lvl);
 void E_Notify(uint8_t b, int lvl);
 void E_NotifyStr(char const * msg, int lvl);
 void E_Notifyc(char c, int lvl);
-
+#define DEBUG_USB_HOST
 #ifdef DEBUG_USB_HOST
 #define Notify E_Notify
 #define NotifyStr E_NotifyStr

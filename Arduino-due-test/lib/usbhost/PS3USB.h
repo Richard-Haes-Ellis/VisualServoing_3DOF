@@ -18,7 +18,6 @@
 #ifndef _ps3usb_h_
 #define _ps3usb_h_
 
-
 #include "Usb.h"
 #include "hid.h"
 #include "PS3Enums.h"
