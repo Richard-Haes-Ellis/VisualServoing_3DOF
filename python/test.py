@@ -3,7 +3,7 @@ import json
 import serial
 import cv2
 
-ser = serial.Serial("/dev/ttyACM0",9600)
+# ser = serial.Serial("/dev/ttyACM0",9600)
 cap = cv2.VideoCapture(0)
 
 face_cascade = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
@@ -38,15 +38,15 @@ while(True):
 
     # Send to microcontroller
 
-    controlSignal = {
-    "m1": 5,
-    "m2": 6452,
-    "m3": 73456
-    }
+    # controlSignal = {
+    # "m1": 5,
+    # "m2": 6452,
+    # "m3": 73456
+    # }
 
-    data = json.dumps(controlSignal)
+    # data = json.dumps(controlSignal)
 
-    ser.write(data.encode('ascii'))
+    # ser.write(data.encode('ascii'))
 
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
