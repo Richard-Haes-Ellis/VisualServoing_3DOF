@@ -21,10 +21,10 @@ def sendPacket(v1,v2,v3):
 
 while True:
     
-    t = t + 0.01
-    a = 10000.0*np.sin(t)
-    b = 10000.0*np.sin(t)
-    c = 10000.0*np.sin(t)
+    t = t + 0.05
+    a = 5000.0*np.sin(t)
+    b = 5000.0*np.sin(t)
+    c = 5000.0*np.sin(t)
     # send and receive via pyserial
     ser.write(sendPacket(a,b,c))
     time.sleep(0.1)

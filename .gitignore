@@ -6,3 +6,4 @@ Arduino-due/test/README
 Arduino-due-test/.travis.yml
 Arduino-due-test/test/README
 Arduino-due-test/lib/usbhost/README
+python/python_env/*

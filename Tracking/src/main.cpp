@@ -361,21 +361,55 @@ void loop()
 #ifdef debug_control_msg
       SerialUSB.println("Saturate and start/stop timers");
 #endif
+      /// SAT ON AXIS 1 ///
+      if(m_payload.numbers[2]<2) // It has to go at least 1 tick per second 
+      {
+        m_payload.numbers[2]=2;
+      }
+      else if(m_payload.numbers[2]>axes[0].max_vel)
+      {
+        m_payload.numbers[2]=axes[0].max_vel;
+      }
+      axes[0].step_delay = T1_FREQ / m_payload.numbers[2];
+
+      /// SAT ON AXIS 2 ///
+      if(m_payload.numbers[1]<2) // It has to go at least 1 tick per second 
+      {
+        m_payload.numbers[1]=2;
+      }
+      else if(m_payload.numbers[1]>axes[1].max_vel)
+      {
+        m_payload.numbers[1]=axes[1].max_vel;
+      }
+      axes[1].step_delay = T1_FREQ / m_payload.numbers[1];
+      
+      /// SAT ON AXIS 3 ///
+      if(m_payload.numbers[0]<2) // It has to go at least 1 tick per second 
+      {
+        m_payload.numbers[0]=2;
+      }
+      else if(m_payload.numbers[0]>axes[2].max_vel) // It cant go faster then the max
+      {
+        m_payload.numbers[0]=axes[2].max_vel;
+      }
+      axes[2].step_delay = T1_FREQ / m_payload.numbers[0];
+
+      // Guarenteed to have a valid delay time
 
       // CALCULATE DELAYS AND SET REGISTER
       if(m_payload.numbers[2] > MIN_DELAY){
         stopTimer(axes[0].tc,axes[0].channel,axes[0].irq);
-        axes[0].tc->TC_CHANNEL[axes[0].channel].TC_RC = (uint32_t)m_payload.numbers[2];
+        axes[0].tc->TC_CHANNEL[axes[0].channel].TC_RC = (uint32_t)axes[0].step_delay;
         startTimer(axes[0].tc,axes[0].channel,axes[0].irq);
       }
       if(m_payload.numbers[1] > MIN_DELAY){
         stopTimer(axes[1].tc,axes[1].channel,axes[1].irq);
-        axes[1].tc->TC_CHANNEL[axes[1].channel].TC_RC = (uint32_t)m_payload.numbers[1];
+        axes[1].tc->TC_CHANNEL[axes[1].channel].TC_RC = (uint32_t)axes[1].step_delay;
         startTimer(axes[1].tc,axes[1].channel,axes[1].irq);
       }
       if(m_payload.numbers[0] > MIN_DELAY){
         stopTimer(axes[2].tc,axes[2].channel,axes[2].irq);
-        axes[2].tc->TC_CHANNEL[axes[2].channel].TC_RC = (uint32_t)m_payload.numbers[0];
+        axes[2].tc->TC_CHANNEL[axes[2].channel].TC_RC = (uint32_t)axes[2].step_delay;
         startTimer(axes[2].tc,axes[2].channel,axes[2].irq);
       }
 #ifdef debug_control_msg
