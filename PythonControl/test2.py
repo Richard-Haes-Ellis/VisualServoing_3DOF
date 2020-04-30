@@ -5,7 +5,7 @@ import struct
 import binascii
 import numpy as np
 
-ser = serial.Serial("/dev/ttyACM0",9600)
+ser = serial.Serial("/dev/ttyACM12",9600)
 time.sleep(3)
 
 t = 0
