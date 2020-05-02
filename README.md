@@ -14,10 +14,6 @@ Here is a video of that working priciple.
 
 ![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/render.png)
 
-Rotating render
-
-![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/display.gif)
-
 The python tracking algorithm is done by kcf tracker.
 
 [References]
