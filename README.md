@@ -7,22 +7,14 @@ The controller is a Arduino Due running a SAM3X8E @ 84Mhz. All steppers are cont
 There is a folder with some python code to track objects and center them automaticly, so one could select a object and have it follow along. 
 
 Here is a video of that working priciple. 
-[Insert video here] 
 
-The python tracking algorithm is done by kcf tracker.
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/working.gif)
 
 3D rederings of the slider it self. Files are available too under CAD folder.
 
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/render.png)
 
-
-
-
-
-
-
-
-
-
+The python tracking algorithm is done by kcf tracker.
 
 [References]
 
