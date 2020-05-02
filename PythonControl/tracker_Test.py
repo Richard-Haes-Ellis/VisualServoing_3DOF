@@ -34,18 +34,18 @@ eix = 0
 eiy = 0
 
 # PID parameters Kp Ki Kd
-kp = 45
-ki = 0.9
-kd = 4
+kp = 60
+ki = 0.25
+kd = 1.8
 
 # Open serial connection to arduino 
-ser = serial.Serial("/dev/ttyACM12",9600)
+ser = serial.Serial("/dev/ttyACM0",9600)
 time.sleep(3)
 
 def sendPacket(v1,v2,v3):
     """Packs a python 4 byte integer to an arduino unsigned long"""
     packet = struct.pack('>biiii',126,int(v1),int(v2),int(v3),2147483647) 
-    print(binascii.hexlify(bytearray(packet)))
+    # print(binascii.hexlify(bytearray(packet)))
     return packet    #should check bounds
 
 
@@ -72,7 +72,6 @@ while True:
 				cv2.line(frame, (int(x+w/2), int(y+h/2)), (int(W/2), int(H/2)),
 					(0,255,0), 2)
 				#### CONTROL ####
-
 				# Calculate p error
 				epx = (x+w/2)-(W/2)
 				epy = (y+h/2)-(H/2)

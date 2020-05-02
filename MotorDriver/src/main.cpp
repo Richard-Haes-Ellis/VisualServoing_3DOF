@@ -2,6 +2,7 @@
 
 // #define debug_com
 #define debug_control_msg
+// #define debug_motor_data
 
 #define T1_FREQ 656250
 #define MIN_DELAY 200
@@ -34,7 +35,7 @@
 float t = 0.0;
 float a = 0.0;
 float b = 0.0;
-float c = 0.0; 
+float c = 0.0;
 long packetTimer = 0;
 
 union payload {
@@ -223,52 +224,115 @@ void setup()
   axes[1].tc->TC_CHANNEL[axes[1].channel].TC_RC = 100000;
   axes[0].tc->TC_CHANNEL[axes[0].channel].TC_RC = 100000;
 
-  startTimer(axes[2].tc,axes[2].channel,axes[2].irq);
-  startTimer(axes[1].tc,axes[1].channel,axes[1].irq);
-  startTimer(axes[0].tc,axes[0].channel,axes[0].irq);
+  startTimer(axes[2].tc, axes[2].channel, axes[2].irq);
+  startTimer(axes[1].tc, axes[1].channel, axes[1].irq);
+  startTimer(axes[0].tc, axes[0].channel, axes[0].irq);
 
   SerialUSB.print("\nReady");
 }
 
+int setMotorSpeed(int32_t speed, uint8_t motor)
+{
+  if (0 < motor && motor < 4) // If motor is in range (1,2,3)
+  {
+    // Enable motor output
+    digitalWrite(axes[motor - 1].enable_pin, LOW);
+
+    // GET AND SET DIRECTION VALUES
+
+    digitalWrite(axes[motor - 1].dir_pin, speed > 0 ? HIGH : LOW);
+
+    // Register those directions in the motor data structures
+    axes[motor - 1].dir = speed > 0 ? CCW : CW;
+
+    // ABS VALUES
+    speed = abs(speed);
+
+    /// SAT ON AXIS 1 ///
+    if (speed == 0) // VELOCITY ZERO
+    {
+      // Disable motor -> speed is zero
+      stopTimer(axes[motor - 1].tc, axes[motor - 1].channel, axes[motor - 1].irq);
+    }
+    else // VELOCITY != ZER0
+    {
+      // If its too high we saturate
+      if (speed > axes[motor - 1].max_vel)
+      {
+        speed = axes[motor - 1].max_vel;
+      }
+
+      // Calculate the delay according to speed
+      axes[motor - 1].step_delay = T1_FREQ / speed;
+
+      // Edit counting register with new delay time
+      stopTimer(axes[motor - 1].tc, axes[motor - 1].channel, axes[motor - 1].irq);
+      axes[motor - 1].tc->TC_CHANNEL[axes[motor - 1].channel].TC_RC = (uint32_t)axes[motor - 1].step_delay;
+      startTimer(axes[motor - 1].tc, axes[motor - 1].channel, axes[motor - 1].irq);
+    }
+#ifdef debug_motor_data
+    SerialUSB.print("M: " + String(motor) + " ");
+    SerialUSB.print("ENA: " + String(axes[motor - 1].enable_pin) + " ");
+    SerialUSB.print("DIR: " + String(axes[motor - 1].dir_pin) + " ");
+    SerialUSB.print("SPEED: " + String(speed) + " ");
+    SerialUSB.print("DELY: " + String((uint32_t)axes[motor - 1].step_delay) + " ");
+#endif
+    return 1;
+  }
+  else
+  {
+    return -1;
+  }
+}
+
 void loop()
 {
-  if(millis()-packetTimer>TIMEOUT){
-    stopTimer(axes[2].tc,axes[2].channel,axes[2].irq);
-    stopTimer(axes[1].tc,axes[1].channel,axes[1].irq);
-    stopTimer(axes[0].tc,axes[0].channel,axes[0].irq);
+  if (millis() - packetTimer > TIMEOUT)
+  {
+    stopTimer(axes[2].tc, axes[2].channel, axes[2].irq);
+    stopTimer(axes[1].tc, axes[1].channel, axes[1].irq);
+    stopTimer(axes[0].tc, axes[0].channel, axes[0].irq);
     digitalWrite(PIN_0_ENABLE, HIGH);
     digitalWrite(PIN_1_ENABLE, HIGH);
     digitalWrite(PIN_2_ENABLE, HIGH);
   }
 
+  // If there is data in our RX buffer
   if (Serial.available())
   {
 #ifdef debug_com
     SerialUSB.println("\nIncomming data:");
 #endif
 
-    int16_t byten = 11;
-    uint8_t state = LISTENING;
-    uint8_t new_packet = 0;
+    // We initialize some control variables
+    int16_t byten = 11;        // Index of our input buffer, we start a 11 because of big-endian (I think)
+    uint8_t state = LISTENING; // Start off on a listening state
+    uint8_t new_packet = 0;    // Flag variable that indicates a valid new data packet
     do
     {
+      // We wait for data to come in
       while (Serial.available() == 0)
-        ;                              // Wait for incomming data // ADD TIMEOUT GOD DAMN IT
-      uint8_t in_byte = Serial.read(); // READ BYTE
+        ; // Wait for incomming data // ADD TIMEOUT GOD DAMN IT
+      // Then we read a byte of that RX buffer
+      uint8_t in_byte = Serial.read();
+
 #ifdef debug_com
       SerialUSB.print("State: " + String(state) + " Byte: ");
       SerialUSB.print(in_byte, HEX);
       SerialUSB.println();
 #endif
+
+      // STATE MACHINE //
       switch (state)
       {
+      // Initially we are listenting for a start byte indicated by the 0x78 byte
       case LISTENING:
         if (in_byte == 0x7E) // CHECK IF ITS START BYTE
         {
 #ifdef debug_com
           SerialUSB.println("\n START command read");
 #endif
-
+          // If the start byte is read then we procceed to read the payload
           state = READ_LOAD;
         }
         else
@@ -277,13 +341,15 @@ void loop()
 #ifdef debug_com
           SerialUSB.println("\nWrong START BYTE");
 #endif
-
+          // If we started listenting and the first byte wasnt a start byte then we restart the listening, the packen has begun without the start packet
           state = END_CMD; // RESET IF IT ISN'T
         }
         break;
 
+      // Reading payload state, payload has a fixed length of 12 anything else will break the packet and restart the state machine
       case READ_LOAD:
-        // Serial.readBytes(m_payload.array,12);
+
+        // Put data in our structure data
         m_payload.array[byten] = in_byte;
         byten--;
         if (byten < 0)
@@ -291,16 +357,14 @@ void loop()
 #ifdef debug_com
           SerialUSB.println("\nRecived 12 bytes");
 #endif
-
-          // for(int i=0;i<12;i++)
-          //   SerialUSB.print(m_payload.array[i],HEX);
+          // When we have read 12 bytes total we go to the end state
           state = READ_END;
           byten = 3;
         }
         break;
 
+      // This state must read a end command composed by 4 bytes
       case READ_END:
-        // Serial.readBytes(m_integer.array,4);
         m_integer.array[byten] = in_byte;
         byten--;
         if (byten < 0)
@@ -312,7 +376,7 @@ void loop()
           SerialUSB.println();
           SerialUSB.println(m_integer.number, HEX);
 #endif
-
+          // If the end command maches the predifined end command then we can say that the packet is good.
           if (m_integer.number == (int32_t)0x7FFFFFFF) // END COMMAND
           {
             // Data is correct
@@ -335,93 +399,33 @@ void loop()
       }
     } while (state != END_CMD);
 
+    // Only when we have a new packet we can do somthing with it
     if (new_packet)
     {
+      // Reset flag
       new_packet = 0;
+
+      // Set a timer to keep track of the amount of time since last packet
       packetTimer = millis();
 
-      digitalWrite(PIN_0_ENABLE, LOW);
-      digitalWrite(PIN_1_ENABLE, LOW);
-      digitalWrite(PIN_2_ENABLE, LOW);
+      /// SET MOTOR SPEED ///
+      setMotorSpeed(m_payload.numbers[2], 1);
+      setMotorSpeed(m_payload.numbers[1], 2);
+      setMotorSpeed(m_payload.numbers[0], 3);
 
-      // GET AND SET DIRECTION VALUES
-      digitalWrite(PIN_0_DIR,m_payload.numbers[2]>0? HIGH:LOW);
-      digitalWrite(PIN_1_DIR,m_payload.numbers[1]>0? HIGH:LOW);
-      digitalWrite(PIN_2_DIR,m_payload.numbers[0]>0? HIGH:LOW);
-
-      axes[0].dir = m_payload.numbers[2] > 0 ? CCW : CW;
-      axes[1].dir = m_payload.numbers[1] > 0 ? CCW : CW; 
-      axes[2].dir = m_payload.numbers[0] > 0 ? CCW : CW; 
-
-      // ABS VALUES
-      m_payload.numbers[2] = abs(m_payload.numbers[2]);
-      m_payload.numbers[1] = abs(m_payload.numbers[1]);
-      m_payload.numbers[0] = abs(m_payload.numbers[0]);
-
-#ifdef debug_control_msg
-      SerialUSB.println("Saturate and start/stop timers");
-#endif
-      /// SAT ON AXIS 1 ///
-      if(m_payload.numbers[2]<2) // It has to go at least 1 tick per second 
-      {
-        m_payload.numbers[2]=2;
-      }
-      else if(m_payload.numbers[2]>axes[0].max_vel)
-      {
-        m_payload.numbers[2]=axes[0].max_vel;
-      }
-      axes[0].step_delay = T1_FREQ / m_payload.numbers[2];
-
-      /// SAT ON AXIS 2 ///
-      if(m_payload.numbers[1]<2) // It has to go at least 1 tick per second 
-      {
-        m_payload.numbers[1]=2;
-      }
-      else if(m_payload.numbers[1]>axes[1].max_vel)
-      {
-        m_payload.numbers[1]=axes[1].max_vel;
-      }
-      axes[1].step_delay = T1_FREQ / m_payload.numbers[1];
-      
-      /// SAT ON AXIS 3 ///
-      if(m_payload.numbers[0]<2) // It has to go at least 1 tick per second 
-      {
-        m_payload.numbers[0]=2;
-      }
-      else if(m_payload.numbers[0]>axes[2].max_vel) // It cant go faster then the max
-      {
-        m_payload.numbers[0]=axes[2].max_vel;
-      }
-      axes[2].step_delay = T1_FREQ / m_payload.numbers[0];
-
-      // Guarenteed to have a valid delay time
-
-      // CALCULATE DELAYS AND SET REGISTER
-      if(m_payload.numbers[2] > MIN_DELAY){
-        stopTimer(axes[0].tc,axes[0].channel,axes[0].irq);
-        axes[0].tc->TC_CHANNEL[axes[0].channel].TC_RC = (uint32_t)axes[0].step_delay;
-        startTimer(axes[0].tc,axes[0].channel,axes[0].irq);
-      }
-      if(m_payload.numbers[1] > MIN_DELAY){
-        stopTimer(axes[1].tc,axes[1].channel,axes[1].irq);
-        axes[1].tc->TC_CHANNEL[axes[1].channel].TC_RC = (uint32_t)axes[1].step_delay;
-        startTimer(axes[1].tc,axes[1].channel,axes[1].irq);
-      }
-      if(m_payload.numbers[0] > MIN_DELAY){
-        stopTimer(axes[2].tc,axes[2].channel,axes[2].irq);
-        axes[2].tc->TC_CHANNEL[axes[2].channel].TC_RC = (uint32_t)axes[2].step_delay;
-        startTimer(axes[2].tc,axes[2].channel,axes[2].irq);
-      }
-#ifdef debug_control_msg
-        SerialUSB.println();
-        SerialUSB.print("Delay M1 = ");
-        SerialUSB.print(m_payload.numbers[2]);
-        SerialUSB.print(" M2 = ");
-        SerialUSB.print(m_payload.numbers[1]);
-        SerialUSB.print(" M3 = ");
-        SerialUSB.println(m_payload.numbers[0]);
+#ifdef debug_motor_data
+      SerialUSB.println();
 #endif
 
+#ifdef debug_control_msg
+      SerialUSB.println();
+      SerialUSB.print("Delay M1 = ");
+      SerialUSB.print(m_payload.numbers[2]);
+      SerialUSB.print(" M2 = ");
+      SerialUSB.print(m_payload.numbers[1]);
+      SerialUSB.print(" M3 = ");
+      SerialUSB.println(m_payload.numbers[0]);
+#endif
     }
   }
 }

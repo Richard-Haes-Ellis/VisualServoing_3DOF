@@ -5,7 +5,7 @@ import struct
 import binascii
 import numpy as np
 
-ser = serial.Serial("/dev/ttyACM12",9600)
+ser = serial.Serial("/dev/ttyACM0",9600)
 time.sleep(3)
 
 t = 0
@@ -22,9 +22,9 @@ def sendPacket(v1,v2,v3):
 while True:
     
     t = t + 0.05
-    a = 5000.0*np.sin(t)
-    b = 5000.0*np.sin(t)
-    c = 5000.0*np.sin(t)
+    a = 2500.0*np.sin(t)
+    b = 2500.0*np.sin(t)
+    c = 2500.0*np.sin(t)
     # send and receive via pyserial
     ser.write(sendPacket(a,b,c))
     time.sleep(0.1)
