@@ -9,6 +9,7 @@ There is a folder with some python code to track objects and center them automat
 
 Here is a video of that working priciple. 
 
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/working.gif)
 
 3D rederings of the slider it self. Files are available too under CAD folder.
 
