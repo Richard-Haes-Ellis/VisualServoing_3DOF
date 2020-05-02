@@ -11,9 +11,10 @@ Here is a video of that working priciple.
 
 
 3D rederings of the slider it self. Files are available too under CAD folder.
-![Alt text](https://github.com/richaeell/MultiAxisSlider3/edit/master/render.png)
 
-![Alt text](https://github.com/richaeell/MultiAxisSlider3/edit/master/display.gif)
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/render.PNG)
+
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/display.gif)
 
 The python tracking algorithm is done by kcf tracker.
 
