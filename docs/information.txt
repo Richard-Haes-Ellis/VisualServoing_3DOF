@@ -1,0 +1,89 @@
+
+Agradecimientos
+
+Resumen
+
+    Resumen
+
+Abstract
+
+    Abstract
+
+Cubierta
+
+Guia de uso 
+
+    A quien esta dirigido 
+    Como esta estrucutrado este documento 
+
+Introducion
+
+    Objetivos del trabjo
+    Alcance del mismo
+    Estado del arte del tracking
+        Problema de tracking
+        Usos del tracking
+    
+
+
+Capitulo 1 - Analisis del problema
+
+    Visualizacion de un objeto en un plano 2D
+    Contruir un mecanismo de minimo 2 grados de libertad
+    Control de alto nivel y robusta de los motores
+    Herramientas de percepcion de alto nivel 
+
+Capitulo 2 - Mecánica
+
+    Herramienta impresion 3D
+    Meacnismo pan-tilt (2dof)
+    Slider (1dog)
+    Doble rodamientos 
+    Equilibrado estatico. 
+    Poleas y correas dentadas
+    Ensablaje completo
+ 
+Capitulo 3 - Electrónica
+
+    Motores paso a paso
+    Especificaciones del mismo 
+    Driver de motores paso a paso
+    Microcontrolador
+    Funente de alimentacion
+    Encoder 
+
+Capitulo 4 - Programacion embedida
+ 
+    Funcionamiento de un motor sincrono 
+    Estrategia de control para motores paso a paso
+    Interrupciones
+
+Capitulo 5 - Comunicación
+
+    Comunicación serial
+    Protocolo binario mediante maquina de estados
+
+Capitulo 6 - Percepción
+
+    Cámara 
+    Librerias OpenCV
+    Técnicas de tracking en Percepcion
+    Eleccion de algoritmos. 
+
+Capitulo 7 - Control mediante PID
+
+    PID en python
+ 
+.
+.
+.
+
+Apendices
+
+    Diseño 3D del Meacnismo
+    Experiminetos 
+    Alternativas de control 
+    Diseño de un dirver para motores DC
+    Diseño de una placa de adaptacion para encoders magneticos
+    
+
