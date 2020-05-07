@@ -8,11 +8,12 @@ There is a folder with some python code to track objects and center them automat
 
 Here is a video of that working priciple. 
 
-![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/working.gif)
+
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/docs/resources/working.gif)
 
 3D rederings of the slider it self. Files are available too under CAD folder.
 
-![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/render.png)
+![Alt text](https://github.com/richaeell/MultiAxisSlider3/blob/master/docs/resources/render.png)
 
 The python tracking algorithm is done by kcf tracker.
 
