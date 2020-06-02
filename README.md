@@ -1,4 +1,4 @@
-# MultiAxisSlider3
+# Visual Servoing with OPENCV
 A 3 axis slider powered by stepper motors and the smart ramps 1.6v cnc shield with XYZ populated 
 by A4988 (Can be replaced by TMC2130 for quiet motion). 
 
