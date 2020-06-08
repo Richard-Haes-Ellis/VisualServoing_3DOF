@@ -9,59 +9,136 @@ Abstract
 
     Abstract
 
-Cubierta
-
-Guia de uso 
-
-    A quien esta dirigido 
-    Como esta estrucutrado este documento 
-
 Introducion
 
+    Guia de uso de este tfg
+        A quien esta dirigido 
+        Como esta estrucutrado este documento
+
     Objetivos del trabjo
-    Alcance del mismo
-    Estado del arte del tracking
+        descripcion del sistema
+
+    Alcance y limites
+        Mecánica
+        Electrónica
+        Programacion embebida
+        Programacion de algoritmos de vision artificial
+
+    Introducion al visual servoing VS 
+        Estado del arte del tracking
         Problema de tracking
-        Usos del tracking
+        Aplicaciones del tracking
     
 
+Capitulo 1 - Esquema general y analisis del sistema
 
-Capitulo 1 - Analisis del problema
+    Esquema genral del sistema
+
+        Bateria
+        Sensores absolutos
+        Motores 
+        Mecanismo 2 gdl 
+        Sistema de transmision por correas 
+        Interfaz por pantalla 
+
+
+    Mecanismos pan tilt 
+        Visualizacion de un objeto en un plano 2D
+        Cinematica directa
+        Cinematica inversa
 
     Visualizacion de un objeto en un plano 2D
-    Contruir un mecanismo de minimo 2 grados de libertad
-    Control de alto nivel y robusta de los motores
-    Herramientas de percepcion de alto nivel 
+        Camaras y tipos
+        algoritmos de percepcion de alto nivel
+            Trackers
+            Detectores 
 
+        Herramientas de precepcion: OpenCV
+
+    Procesamiento por PC
+        python 
+        Comunicacion binaria 
+
+    Control tiempo-real
+        esquema de control
+        
 Capitulo 2 - Mecánica
 
-    Herramienta impresion 3D
-    Meacnismo pan-tilt (2dof)
-    Slider (1dog)
-    Doble rodamientos 
-    Equilibrado estatico. 
-    Poleas y correas dentadas
+    Diseño CAD  
+        Fusion 360 - licencia de estudiantes.
+    
+    Motores usado 
+        stepper motors - funcionamiento 
+
+    Sistemas de transmision
+
+        Diseño de una transmision por correa dentada
+        Diseño de poleas dentadas
+    
+    Diseño de mecanismos de 2 grados de libertad
+        tipos de mecanismos
+            -cilindicos
+            -planarios
+            -esfericos
+
+    Diseño de ejes
+        Un rodamiento
+        Doble rodamiento
+
+    Slider (1dof) 
+        perfiles de aluminio estandar
+        V-Slot
+    
+    Fabricacion aditiva mediante impresion 3D
+        ¿Cómo funciona?
+        Codigo G
+        Slicer
+        Parametros
+        Tolerancias
+
     Ensablaje completo
  
 Capitulo 3 - Electrónica
 
-    Motores paso a paso
-    Especificaciones del mismo 
-    Driver de motores paso a paso
+    Elección de componentes
+    Motor paso a paso
+        Especificaciones electricas del mismo
+        Driver de motores paso a paso
+
     Microcontrolador
+        Requisitos
+        ATmel SAM3XE @ 84 Mhz
+        Especificaciones
+    
+    Pantalla Nextion
+        Interfaz
+        Herramieta de diseño de interfaces
+        Comunicacion
+
     Funente de alimentacion
-    Encoder 
+        Fuente regulable 
+        Batería
+    
+    Encoder
+        AS5048B - Encoder magnetico  
+
+Capitulo 5 - Comunicación micro-pc
+
+    Metodos de Comunicación
+    Comunicacion serial
+        - Funcionamiento
+        - Protocolo
+    
+    Protocolo a nivel de aplicacion
+        Comunicación maquina-maquina
+        Protocolo binario mediante maquina de estados
 
 Capitulo 4 - Programacion embedida
  
     Funcionamiento de un motor sincrono 
     Estrategia de control para motores paso a paso
     Interrupciones
-
-Capitulo 5 - Comunicación
-
-    Comunicación serial
-    Protocolo binario mediante maquina de estados
+    Datasheet del micro
 
 Capitulo 6 - Percepción
 
@@ -72,8 +149,9 @@ Capitulo 6 - Percepción
 
 Capitulo 7 - Control mediante PID
 
-    PID en python
- 
+    (Teoria de PID)
+    Implementacion de un PID en Codigo
+    Python
 .
 .
 .
