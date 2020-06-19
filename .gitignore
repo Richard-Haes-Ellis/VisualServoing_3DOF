@@ -38,3 +38,6 @@ docs/latex/introduccion/*
 *.toc
 *.acn
 
+PythonControl/tracker_env/bin/*
+PythonControl/tracker_env/lib/*
+PythonControl/tracker_env/pyvenv.cfg
