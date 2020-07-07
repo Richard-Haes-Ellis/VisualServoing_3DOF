@@ -19,7 +19,13 @@ The python tracking algorithm is done by kcf tracker.
 
 [References]
 
-- Some of the code is from iforce2D's video about stepper motors - https://www.youtube.com/watch?v=fHAO7SW-SZI&t=3s
-- AVR Guide to stepper motor controll with interrupts - http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
-- SAM3X8E Datasheet - http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-11057-32-bit-Cortex-M3-Microcontroller-SAM3X-SAM3A_Datasheet.pdf
+- Some of the code is from iforce2D's video about stepper motors: https://www.youtube.com/watch?v=fHAO7SW-SZI&t=3s
+- AVR Guide to stepper motor controll with interrupts: http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
+- SAM3X8E Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-11057-32-bit-Cortex-M3-Microcontroller-SAM3X-SAM3A_Datasheet.pdf
+- SAM3X8E API (ASF): https://asf.microchip.com/docs/latest/sam3x/html/group__asfdoc__sam__drivers__tc__group.html
 
+- SAM3X8E Timer example: https://asf.microchip.com/docs/latest/sam3x/html/asfdoc_sam_drivers_tc_qsg.html
+
+- SAM3 Timers Application notes from ATMEL: http://ww1.microchip.com/downloads/en/AppNotes/Atmel-42301-SAM3-4S-4L-4E-4N-4CM-4C-G-Timer-Counter-TC-Driver_ApplicationNote_AT07898.pdf
+
+- SAM3 Timers Application notes from Copper Hill Tech: https://copperhilltech.com/content/Application%20Note%20-%20Arduino%20Due%20Timer%20Control.pdf

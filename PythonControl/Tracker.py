@@ -8,6 +8,9 @@ import time
 import serial
 import binascii
 import cv2
+import itertools
+import matplotlib.pyplot as plt
+import numpy as np
 
 # grab the appropriate object tracker using our dictionary of
 # OpenCV object tracker objects
@@ -41,6 +44,22 @@ kd = 1.8
 # Open serial connection to arduino 
 ser = serial.Serial("/dev/ttyACM0",9600)
 time.sleep(3)
+
+posX = []
+posY = []
+posXerr = []
+posYerr = []
+velx = []
+vely = []
+Time = []
+
+cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+# set your desired size
+cv2.resizeWindow('Frame', 1080, 1920)
+
+def flip(items, ncol):
+    return itertools.chain(*[items[i::ncol] for i in range(ncol)])
+
 
 def sendPacket(v1,v2,v3):
     """Packs a python 4 byte integer to an arduino unsigned long"""
@@ -90,14 +109,25 @@ while True:
 				#print('dErrx:{}   dErry:{}'.format(d_error_x,d_error_x))
 
 				# Calculate control signal
-				u_x = (kp*epx + ki*eix + kd*edx)
-				u_y = -(kp*epy + ki*eiy + kd*edy)
+				u_x = -(kp*epx + ki*eix + kd*edx)
+				u_y = (kp*epy + ki*eiy + kd*edy)
 
 				# Send to microcontroller
 				ser.write(sendPacket(0,u_x,u_y))
 
 				epx_1 = epx
 				epy_1 = epy
+
+				posXerr.append(epx)
+				posX.append(x+w/2)
+				posYerr.append(epy)
+				posY.append(y+h/2)
+
+				velx.append(u_x)
+				vely.append(u_y)
+
+				Time.append(time.time())
+
 			else:
 				# Nothing is being tracked
 				# Stop any controller variables or control signals
@@ -123,7 +153,6 @@ while True:
 				cv2.putText(frame, text, (10, H - ((i * 20) + 20)),
 					cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 						# show the output frame
-
 		cv2.imshow("Frame", frame)
 		key = cv2.waitKey(1) & 0xFF
 		# if the 's' key is selected, we are going to "select" a bounding
@@ -143,6 +172,34 @@ while True:
 
 # release the pointer
 vs.stop()
+
+dist = np.sqrt(np.square(posX)+np.square(posY)) 
+err = np.sqrt(np.square(posXerr)+np.square(posYerr))
+
+grid = plt.GridSpec(3, 2)
+plt.subplot(grid[0:2, 0:2])
+
+plt.xlim([0,W])
+plt.ylim([0,H])
+
+plt.plot(posX,posY)
+
+plt.grid('on')
+
+plt.title('Posicion XY')
+plt.xlabel('X')
+plt.ylabel('Y')
+
+plt.subplot(grid[2, :])
+plt.plot(Time, err)
+# plt.plot(Time,vely ,label='Velocity cmd')
+plt.grid('on')
+
+plt.title('Error')
+plt.xlabel('Tiempo')
+plt.ylabel('Error')
+
+plt.show()
 
 # close all windows
 cv2.destroyAllWindows()

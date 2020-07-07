@@ -26,5 +26,5 @@ while True:
     b = 2500.0*np.sin(t)
     c = 2500.0*np.sin(t)
     # send and receive via pyserial
-    ser.write(sendPacket(a,b,c))
+    ser.write(sendPacket(int(a),int(b),int(0)))
     time.sleep(0.1)
