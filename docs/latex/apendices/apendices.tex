@@ -3,59 +3,79 @@
 
 
 %APENDICE A
-\chapter{Sobre  \LaTeX}\LABAPEN{ApA}
-{Este es un ejemplo de apéndices, el texto es únicamente relleno, para que el lector pueda observar cómo se utiliza}
+\chapter{ }\LABAPEN{ApA}
+{}
 %%%%%%%%%%%%%%%%%
-\section{Ventajas de \LaTeX}
 
-El gusto por el \LaTeX\ depende de la forma de trabajar de cada uno. La principal virtud es la facilidad de formatear cualquier texto y la robustez. Incluir títulos, referencias es inmediato.
-%\Blindtext
-%\lipsum
-Las ecuaciones quedan estupendamente, como puede verse en \EQ{Ap1}
-\begin{equation}\LABEQ{Ap1}
-x_{1}=x_{2}.
-\end{equation}
+\subsection{Encoders magneticos}
 
+Para los ejes del mecanismo \indexit{"pan-tilt"} se optó por incorporar un tipo de sensores usados ampliamente en la róbotica, 
+los sensores magnéticos de effecto hall. En la figura \FIG{as5047} se muestra un diagrama del sensor elegido con una 
+ilustración del su funcionamiento. Sin embargo no se llego a usar dado que podemos contar en bucle abierto la posición exacta de 
+los motores. Aún asi se podrían incorporar más adelante para detectar si ha habido alguna colisión o para mover el mecanismo
+con los motores deshabilitados y no perder su posición. Esto es útil si queremos entenar al robot varios puntos moviedo el 
+mecanismo a mano y que repita ese moviemiento automáticamente.
 
-\section{Inconvenientes}
-%\Blindtext
-El principal inconveniente de \LaTeX\ radica en la necesidad de aprender un conjunto de comandos para generar los elementos que queremos. Cuando se está acostumbrado a un entorno ``como lo escribo se obtiene'', a veces resulta difícil dar el salto a ``ver'' que es lo que se va a obtener con un determinado comando. 
+\begin{figure}[htbp]
+    \includegraphics[width=10 cm]{Capitulo3/figuras/as5047.pdf}
+    \caption{Sensor montado en eje AS504X}
+    \LABFIG{as5047} %Esto es una forma propia de los autores de gestionar las etiquetas y referencias
+    \end{figure}
 
-Por otro lado, en general será muy complicado cambiar el formato para desviarnos de la idea original de sus creadores. No es imposible, pero sí muy difícil. Por ejemplo, con la sentencia siguiente:
- 
-\begin{lstlisting}[language=,caption={Escritura de una ecuación}, breaklines=true, label=prgA1-01]
-\begin{equation}\LABEQ{Ap2}
-x_{1}=x_{2}
-\end{equation}
-\end{lstlisting}
-obtenemos:
-\begin{equation}\LABEQ{Ap2}
-x_{1}=x_{2}
-\end{equation}
-Esto será siempre así. Aunque, tal vez, esto podría ser una ventaja y no un incoonveniente.
+El sensor magnético usado es uno que se monta en el propio eje del motor. Un imán que está magnetizado axialemtne se coloca en 
+el rotor del motor o eje móvil cuyo ángulo es el que se quiere medir y se coloca el sensor concentricamente al eje debajo del imán. Este sensor 
+esta dispuesto de 4 sensores hall combinadas con un puente de wheatstone, posee circuitería interna que se encarga del acondicionamiento
+de las señales del puente, además nos proporciona una interfaz digital por el cual podemos hacer la lectura del ángulo. 
 
-Para una discusión similar sobre el Word\tsp{\textregistered}, ver \APEN{ApB}.
-%\Blindtext
+Estos tipos de sensores suelen ser mas caros, por ello y con motivo de aprender la diciplina de diseño de PCBs, se
+diseño una placa de adaptación para el sensor. El diseño se ha realizado mediante EasyEDA. El resultado del diseño y su funcionamiento
+esta reflejado en la figura. 
 
+\begin{figure}[htbp]
+    \includegraphics[width=10 cm]{Capitulo3/figuras/pcb.pdf}
+    \caption{PCB para el sensor AS504X}
+    \LABFIG{pcb_board} %Esto es una forma propia de los autores de gestionar las etiquetas y referencias
+    \end{figure}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%APENDICE B
-\chapter{Sobre Microsoft Word\tsp{\textregistered}}\LABAPEN{ApB}
-
-\section{Ventajas del Word\tsp{\textregistered}}
-La ventaja mayor del Word\tsp{\textregistered} es que permite configurar el formato muy fácilmente. Para las ecuaciones,
-\begin{equation}
-x_{1}=x_{2},
-\end{equation}
-tradicionalmente ha proporcionado pésima presentación. Sin embargo, el software adicional Mathtype\tsp{\textregistered} solventó este problema, incluyendo una apariencia muy profesional y cuidada. Incluso permitía utilizar un estilo similar al \LaTeX\xspace. Además, aunque el Word\tsp{\textregistered} incluye sus propios atajos para escribir ecuaciones,  Mathtype\tsp{\textregistered} admite también escritura \LaTeX\xspace. En las últimas versiones de Word\tsp{\textregistered}, sin embargo, el formato de ecuaciones está muy cuidado, con un aspecto similar al de \LaTeX.
+En la figura \FIG{pcb_board} vemos una placa de adaptación para el sensor magnético integrado en configuración absoluta con interfáz i2C.
+Por tanto podemos leer mediante el bus i2c el valor absoluto de posición de la articulación deseada y como se conecta al bus i2C podemos
+conectar varios de estos sensores en cadena ya que esta dispuesto en la pcb unos jumpers para preselecionar la dirección por defecto de dispositvo.
 
 
-\section{Inconvenientes de Word\tsp{\textregistered}}
-Trabajar con títulos, referencias cruzadas e índices es un engorro, por no decir nada sobre la creación de una tabla de contenidos. Resulta muy frecuente que alguna referencia quede pérdida o huérfana y aparezca un mensaje en negrita indicando que  no se encuentra. 
+% https://www.roboticsbible.com/robot-mechanical-transmission-systems.html
 
-Los estilos permiten trabajar bien definiendo la apariencia, pero también puede desembocar en un descontrolado incremento de los mismos. Además, es muy probable que Word\tsp{\textregistered} se quede colgado, sobre todo al trabajar con copiar y pegar de otros textos y cuando se utilizan ficheros de gran extensión, como es el caso de un libro.
+% https://www.elprocus.com/stepper-motor-types-advantages-applications/
 
-%\end{equation}
+% https://www.nema.org/Standards/SecureDocuments/ICS16.pdf
 
+% Instrument Engineers' Handbook, Vol. 2: Process Control and Optimization, 4th Edition. Ed. Liptak, Bela G, N.p.: CRC Press. Print
 
-\lstinputlisting{../../MotorDriver/src/main.cpp}
+% https://www.arduino.cc/
+
+% https://www.pololu.com/product/2980
+
+% https://www.electronicshub.org/basics-uart-communication/
+
+% https://copperhilltech.com/content/Application%20Note%20-%20Arduino%20Due%20Timer%20Control.pdf
+
+% https://asf.microchip.com/docs/latest/sam3x/html/asfdoc_sam_drivers_tc_qsg.html
+
+% http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
+
+% https://www.youtube.com/watch?v=fHAO7SW-SZI&t=3s
+
+% http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-11057-32-bit-Cortex-M3-Microcontroller-SAM3X-SAM3A_Datasheet.pdf
+
+% https://asf.microchip.com/docs/latest/sam3x/html/group__asfdoc__sam__drivers__tc__group.html
+
+% http://ww1.microchip.com/downloads/en/AppNotes/Atmel-42301-SAM3-4S-4L-4E-4N-4CM-4C-G-Timer-Counter-TC-Driver_ApplicationNote_AT07898.pdf
+
+% P. Corke. Dynamic issues in robot visual-servo systems. In International Symposium on Robotics Research, pages 488–498, 1995.   
+
+% F. Chaumette. Potential problems of stability and convergence on image-based and position-based visual servoing. In D. Kriegman, G. Hagar, and S. Morse, editors, Con- fluence of Vision and Control, Lecture Notes in Control and Information Systems, volume 237, pages 66–78. Springer-Verlag, 1998
+
+% J. T. Feddema and O. R. Mitchell. Vision-guided servoing with feature-based tra- jectory generation. IEEE Transactions on Robotics and Automation, 5(5):691–700, October 1989
+
+% Emilio Maggio; Andrea Cavallaro (2010). Video Tracking: Theory and Practice. 1. ISBN 9780132702348. "Video Tracking provides a comprehensive treatment of the fundamental aspects of algorithm and application development for the task of estimating, over time."
+
+% J.F. Henriques, et al. “High-Speed Tracking with Kernelized Correlation Filters.” IEEE Transactions on Pattern Analysis and Machine Intelligence, 37 (3) (2015), pp. 583-596

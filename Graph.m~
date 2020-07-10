@@ -1,0 +1,67 @@
+t = Time./10 - Time(1)/10
+
+
+% Error cometido en el timepo en x e y 
+figure;
+subplot(1,2,1);
+plot(t,errX);
+title('Error eje X');
+xlabel('Tiempo (s)');
+ylabel('Píxeles (px)')
+subplot(1,2,2);
+plot(t,errY);
+title('Error eje Y');
+xlabel('Tiempo (s)')
+ylabel('Píxeles (px)')
+
+% Visualización 3D del error cometido en el tiempo
+figure;
+subplot(2,2,1)
+plot3(t,errX,errY);
+title('Error en X');
+xlabel('Tiempo (s)')
+ylabel('Píxeles x (px)')
+grid;
+
+subplot(2,2,3)
+plot3(t,errX,errY);
+title('Error en Y');
+xlabel('Tiempo (s)')
+zlabel('Píxeles y (px)')
+grid;
+
+subplot(2,2,2)
+plot3(t,errX,errY);
+title('Error en XY');
+xlabel('Tiempo (s)')
+ylabel('Píxeles x (px)')
+zlabel('Píxeles y (px)')
+grid;
+
+subplot(2,2,4)
+plot3(t,errX,errY);
+title('Error en XY');
+xlabel('Tiempo (s)')
+ylabel('Píxeles x (px)')
+zlabel('Píxeles y (px)')
+grid;
+
+figure;
+plot(errX,errY);
+grid;
+title('Error en XY');
+xlabel('Píxeles x (px)')
+ylabel('Píxeles y (px)')
+xlim([-250 250])
+ylim([-250 250])
+
+absolute = sqrt(errX.^2 + errY.^2)
+
+figure;
+plot(t,absolute);
+grid;
+title('Error en XY');
+xlabel('Tiempo (s)')
+ylabel('Píxeles absolutos (px)')
+xlim([-250 250])
+ylim([-250 250])

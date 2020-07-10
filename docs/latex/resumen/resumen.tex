@@ -5,7 +5,31 @@
 \phantomsection
 \addcontentsline{toc}{listasf}{Resumen}
 
-\lettrine[lraise=-0.1, lines=2, loversize=0.2]{E}{n} nuestra Escuela se producen un número considerable de documentos, tantos docentes como investigadores. Nuestros alumnos también contribuyen a esta producción a través de sus trabajos de fin de grado, máster y tesis. El objetivo de este material es facilitar la edición de todos estos documentos y a la vez fomentar nuestra imagen corporativa, facilitando la visibilidad y el reconocimiento de nuestro Centro.
+\lettrine[lraise=-0.1, lines=2, loversize=0.2]{E}{n} este proyecto se presenta un robot de 3 grados de libertad compuesto por 
+un mecanismo tipo \textit{"pan-tilt"} montado encima de un rail permitiendo su desplazamiento lateral. Este robot es capaz 
+de visualizar mediante una cámara 2D cualquier objeto en su campo de visión y realizar un seguimiento del mismo, centrando  
+el objetivo en el centro de la imagen. Esto se consigue controlando los motores mediante un control PID, donde la señal 
+a controlar es la posición del objeto en la imagen y el error es la diferencia entre esta posición el centro de la imagen.
+
+Para la realización de este trabajo se echaba en falta un robot como el descrito anteriormente, por tanto, se tomo la iniciativa 
+de diseñar, simular en CAD, fabricar y ensamblar el robot a medida para esta aplicación. Se entra en profundidad en el diseño mecánico 
+explicando el funcionamento de las diferentes articulaciones y se explica también el sistema electrónico que maneja los motores y 
+sensores del sistema. Además se ha llevado a cabo la programación del control de los motores mediante interrupciones y timers, permitiendo 
+un funcionamento eficiente del sistema embebido. 
+
+Como es de saber, la tarea de seguimiento de objetos mediante visión artificial es costosa a nivel de computación, por tanto se ha 
+realizado los programas de tracking en un PC para obtener un rendimiento aceptable. Aqui surge la necesidad de comunicar de forma rápida 
+y segura, el microcontrolador y el PC. Esta comunicación se implemento usando una máquina de estados que permite manejar paquetes de 
+información que provienen del PC. 
+
+Con esto solo queda el control. El control se implmenetó en el PC en el mismo bucle que realiza el seguimiento del objeto, aqui hemos ajustado 
+las ganacias $Kp$,$Ki$,$Kd$ experimentalmente para obtener una buena respuesta del sistema ante perturbaciones, ya que la referencia del control 
+es siempre constante, siendo esta el centro de la imagen.
+
+Este proyecto ha sido en gran parte posible por la utilización de la herramienta GIT. Se ha creado un repositorio donde esta alojado toda la información
+relevante al proyecto incluyendo los modelos 3D, los códigos y el historial de commits. El proyecto estará liberado bajo la licencia BSD, por tanto esta 
+disponible a toda persona interesada en mejorar y contribuir al proyecto o para cualquier uso.
+
 
 %La hoja de estilo utilizada es una versión de la que el Prof. Payán realizó para un libro que desde hace tiempo viene escribiendo para su asignatura. Con ella se han realizado estas notas, a modo de instrucciones, añadiéndole el diseño de la portada. El diseño de la portada está basado en el que el prof. Fernando García García, de nuestra universidad, hiciera para los libros de la sección de publicación de nuestra Escuela.
 
@@ -16,8 +40,31 @@
 \phantomsection
 \addcontentsline{toc}{listasf}{Abstract}
 
-\lettrine[lraise=-0.1, lines=2, loversize=0.2]{I}{n} our school there are a considerable number of documents, many teachers and researchers. Our students also contribute to this production through its work in order of degree, master's theses. The aim of this material is easier to edit these documents at the same time promote our corporate image, providing visibility and recognition of our Center. 
+\lettrine[lraise=-0.1, lines=2, loversize=0.2]{T}{h}is project presents a 3 degrees of freedom robot made up of a "pan-tilt" mechanism
+mounted on top of a rail allowing lateral displacement. This robot is able to visualize
+using a 2D camera, any object in its field of view and track it, while centering the object in the center of the image. This is achieved by 
+controlling the motors by means of a PID controller, where the signal to control is the position of the object in the image and the error is the 
+difference between its position and the center of the image.
 
-...
-\emph{-translation by google-}
+To carry out this work, a robot such as the one described above was needed, therefore,
+I've take the liberty to design, simulate in CAD, manufacture and assemble the robot to spec for this application.
+This document goes into depth in the mechanical design, explaining the functioning of the different joints
+and the electronic system that drives the motors and sensors of the system. In addition,
+programming of motor control by interrupts and timers has been carried out, allowing a
+efficient operation of the embedded system.
+
+As you know, the task of tracking objects using machine vision is expensive in terms of computing power, therefore tracking programs have been 
+performed on a PC to obtain acceptable performance. Consequently the need arises to communicate the microcontroller and the PC quickly and reliably. 
+This communication was implemented using a state machine that allows managing information packets
+that come from the PC, this helps to eliminate false or corrupt information to be executed by the microcontroller.
+
+With all the above complete, only control remains. The control was implemented in the PC in the same loop that takes care of the
+tracking, here we have adjusted the gains $Kp$, $Ki$, $Kd$ experimentally to obtain a
+good response of the system to disturbances, since the control reference is always constant, this being the center of the image.
+
+This project has been largely possible due to the use of the GIT tool. All the relevant information is stored in a public repositoy, including 3D models,
+codes and commit history. The project will be released under the BSD license, therefore it is available
+to any person interested in improving and contributing to the project or for any use.
+
+
 

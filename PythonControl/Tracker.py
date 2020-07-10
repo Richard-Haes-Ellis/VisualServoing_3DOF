@@ -7,6 +7,7 @@ import struct
 import time
 import serial
 import binascii
+import scipy.io
 import cv2
 import itertools
 import matplotlib.pyplot as plt
@@ -172,6 +173,10 @@ while True:
 
 # release the pointer
 vs.stop()
+
+mdic = {"Time":Time,"X":posX,"errX":posXerr,"Y":posY,"errY":posYerr}
+
+scipy.io.savemat("matlab_matrix.mat", mdic)
 
 dist = np.sqrt(np.square(posX)+np.square(posY)) 
 err = np.sqrt(np.square(posXerr)+np.square(posYerr))
